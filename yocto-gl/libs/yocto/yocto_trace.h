@@ -110,6 +110,11 @@ struct trace_params {
   int                   pratio         = 8;
   bool                  denoise        = false;
   int                   batch          = 1;
+
+  // MY CODE: Add FLAGs to switch intersection methods
+  bool points_as_spheres  = false;
+  bool lines_as_cones     = false;
+  bool quads_as_patches   = false;
 };
 
 // Progressively computes an image.

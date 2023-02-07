@@ -122,30 +122,41 @@ static scene_intersection intersect_instance(const trace_bvh& bvh,
 namespace yocto {
 
 // Convenience functions
+// MY CODE: Add FLAGs to switch intersection methods
 [[maybe_unused]] static vec3f eval_position(
-    const scene_data& scene, const scene_intersection& intersection) {
+    const scene_data& scene, const scene_intersection& intersection, 
+    const bool quads_as_patches) {
   return eval_position(scene, scene.instances[intersection.instance],
-      intersection.element, intersection.uv);
+      intersection.element, intersection.uv, quads_as_patches);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[maybe_unused]] static vec3f eval_normal(
-    const scene_data& scene, const scene_intersection& intersection) {
+    const scene_data& scene, const scene_intersection& intersection, 
+    const bool quads_as_patches) {
   return eval_normal(scene, scene.instances[intersection.instance],
-      intersection.element, intersection.uv);
+      intersection.element, intersection.uv, quads_as_patches);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[maybe_unused]] static vec3f eval_element_normal(
-    const scene_data& scene, const scene_intersection& intersection) {
+    const scene_data& scene, const scene_intersection& intersection, 
+    const bool quads_as_patches) {
   return eval_element_normal(
-      scene, scene.instances[intersection.instance], intersection.element);
+      scene, scene.instances[intersection.instance], intersection.element, 
+      quads_as_patches);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[maybe_unused]] static vec3f eval_shading_position(const scene_data& scene,
-    const scene_intersection& intersection, const vec3f& outgoing) {
+    const scene_intersection& intersection, const vec3f& outgoing, 
+    const bool quads_as_patches) {
   return eval_shading_position(scene, scene.instances[intersection.instance],
-      intersection.element, intersection.uv, outgoing);
+      intersection.element, intersection.uv, outgoing, quads_as_patches);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[maybe_unused]] static vec3f eval_shading_normal(const scene_data& scene,
-    const scene_intersection& intersection, const vec3f& outgoing) {
+    const scene_intersection& intersection, const vec3f& outgoing, 
+    const bool quads_as_patches) {
   return eval_shading_normal(scene, scene.instances[intersection.instance],
-      intersection.element, intersection.uv, outgoing);
+      intersection.element, intersection.uv, outgoing, quads_as_patches);
 }
 [[maybe_unused]] static vec2f eval_texcoord(
     const scene_data& scene, const scene_intersection& intersection) {
@@ -357,9 +368,11 @@ static ray3f sample_camera(const camera_data& camera, const vec2i& ij,
   }
 }
 
+// MY CODE: Add FLAGs to switch intersection methods
 // Sample lights wrt solid angle
 static vec3f sample_lights(const scene_data& scene, const trace_lights& lights,
-    const vec3f& position, float rl, float rel, const vec2f& ruv) {
+    const vec3f& position, float rl, float rel, const vec2f& ruv, 
+    const bool quads_as_patches) {
   auto  light_id = sample_uniform((int)lights.lights.size(), rl);
   auto& light    = lights.lights[light_id];
   if (light.instance != invalidid) {
@@ -367,7 +380,8 @@ static vec3f sample_lights(const scene_data& scene, const trace_lights& lights,
     auto& shape     = scene.shapes[instance.shape];
     auto  element   = sample_discrete(light.elements_cdf, rel);
     auto  uv        = (!shape.triangles.empty()) ? sample_triangle(ruv) : ruv;
-    auto  lposition = eval_position(scene, instance, element, uv);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto  lposition = eval_position(scene, instance, element, uv, quads_as_patches);
     return normalize(lposition - position);
   } else if (light.environment != invalidid) {
     auto& environment = scene.environments[light.environment];
@@ -387,9 +401,11 @@ static vec3f sample_lights(const scene_data& scene, const trace_lights& lights,
   }
 }
 
+// MY CODE: Add FLAGs to switch intersection methods
 // Sample lights pdf
 static float sample_lights_pdf(const scene_data& scene, const trace_bvh& bvh,
-    const trace_lights& lights, const vec3f& position, const vec3f& direction) {
+    const trace_lights& lights, const vec3f& position, const vec3f& direction, 
+    const bool quads_as_patches) {
   auto pdf = 0.0f;
   for (auto& light : lights.lights) {
     if (light.instance != invalidid) {
@@ -402,10 +418,12 @@ static float sample_lights_pdf(const scene_data& scene, const trace_bvh& bvh,
             bvh, scene, light.instance, {next_position, direction});
         if (!intersection.hit) break;
         // accumulate pdf
+        // MY CODE: Add FLAGs to switch intersection methods
         auto lposition = eval_position(
-            scene, instance, intersection.element, intersection.uv);
+            scene, instance, intersection.element, intersection.uv, 
+            quads_as_patches);
         auto lnormal = eval_element_normal(
-            scene, instance, intersection.element);
+            scene, instance, intersection.element, quads_as_patches);
         // prob triangle * area triangle = area triangle mesh
         auto area = light.elements_cdf.back();
         lpdf += distance_squared(lposition, position) /
@@ -491,8 +509,12 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      auto position = eval_shading_position(scene, intersection, outgoing);
-      auto normal   = eval_shading_normal(scene, intersection, outgoing);
+      // MY CODE: Add FLAGs to switch intersection methods
+      auto position = eval_shading_position(scene, intersection, outgoing, 
+          params.quads_as_patches);
+      // MY CODE: Add FLAGs to switch intersection methods
+      auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+          params.quads_as_patches);
       auto material = eval_material(scene, intersection);
 
       // correct roughness
@@ -526,15 +548,19 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
           incoming = sample_bsdfcos(
               material, normal, outgoing, rand1f(rng), rand2f(rng));
         } else {
+          // MY CODE: Add FLAGs to switch intersection methods
           incoming = sample_lights(
-              scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
+              scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
+              params.quads_as_patches);
         }
         if (incoming == vec3f{0, 0, 0}) break;
         weight *=
             eval_bsdfcos(material, normal, outgoing, incoming) /
             (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
                 0.5f *
-                    sample_lights_pdf(scene, bvh, lights, position, incoming));
+                    // MY CODE: Add FLAGs to switch intersection methods
+                    sample_lights_pdf(scene, bvh, lights, position, incoming, 
+                    params.quads_as_patches));
       } else {
         incoming = sample_delta(material, normal, outgoing, rand1f(rng));
         weight *= eval_delta(material, normal, outgoing, incoming) /
@@ -568,14 +594,18 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       if (rand1f(rng) < 0.5f) {
         incoming = sample_scattering(vsdf, outgoing, rand1f(rng), rand2f(rng));
       } else {
+        // MY CODE: Add FLAGs to switch intersection methods
         incoming = sample_lights(
-            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
+            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
+            params.quads_as_patches);
       }
       if (incoming == vec3f{0, 0, 0}) break;
       weight *=
           eval_scattering(vsdf, outgoing, incoming) /
           (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+              // MY CODE: Add FLAGs to switch intersection methods
+              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
+              params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -638,8 +668,12 @@ static trace_result trace_pathdirect(const scene_data& scene,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      auto position = eval_shading_position(scene, intersection, outgoing);
-      auto normal   = eval_shading_normal(scene, intersection, outgoing);
+      // MY CODE: Add FLAGs to switch intersection methods
+      auto position = eval_shading_position(scene, intersection, outgoing, 
+          params.quads_as_patches);
+      // MY CODE: Add FLAGs to switch intersection methods
+      auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+          params.quads_as_patches);
       auto material = eval_material(scene, intersection);
 
       // correct roughness
@@ -669,9 +703,13 @@ static trace_result trace_pathdirect(const scene_data& scene,
 
       // direct
       if (!is_delta(material)) {
+        // MY CODE: Add FLAGs to switch intersection methods
         auto incoming = sample_lights(
-            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
-        auto pdf = sample_lights_pdf(scene, bvh, lights, position, incoming);
+            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
+            params.quads_as_patches);
+        // MY CODE: Add FLAGs to switch intersection methods
+        auto pdf = sample_lights_pdf(scene, bvh, lights, position, incoming, 
+            params.quads_as_patches);
         auto bsdfcos = eval_bsdfcos(material, normal, outgoing, incoming);
         if (bsdfcos != vec3f{0, 0, 0} && pdf > 0) {
           auto intersection = intersect_scene(bvh, scene, {position, incoming});
@@ -683,7 +721,9 @@ static trace_result trace_pathdirect(const scene_data& scene,
                                       intersection.element, intersection.uv),
                         eval_shading_normal(scene,
                             scene.instances[intersection.instance],
-                            intersection.element, intersection.uv, -incoming),
+                            intersection.element, intersection.uv, -incoming,
+                            // MY CODE: Add FLAGs to switch intersection methods
+                            params.quads_as_patches),
                         -incoming);
           radiance += weight * bsdfcos * emission / pdf;
         }
@@ -699,15 +739,19 @@ static trace_result trace_pathdirect(const scene_data& scene,
           incoming = sample_bsdfcos(
               material, normal, outgoing, rand1f(rng), rand2f(rng));
         } else {
+          // MY CODE: Add FLAGs to switch intersection methods
           incoming = sample_lights(
-              scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
+              scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
+              params.quads_as_patches);
         }
         if (incoming == vec3f{0, 0, 0}) break;
         weight *=
             eval_bsdfcos(material, normal, outgoing, incoming) /
             (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
                 0.5f *
-                    sample_lights_pdf(scene, bvh, lights, position, incoming));
+                    // MY CODE: Add FLAGs to switch intersection methods
+                    sample_lights_pdf(scene, bvh, lights, position, incoming, 
+                    params.quads_as_patches));
       } else {
         incoming = sample_delta(material, normal, outgoing, rand1f(rng));
         if (incoming == vec3f{0, 0, 0}) break;
@@ -739,14 +783,18 @@ static trace_result trace_pathdirect(const scene_data& scene,
       if (rand1f(rng) < 0.5f) {
         incoming = sample_scattering(vsdf, outgoing, rand1f(rng), rand2f(rng));
       } else {
+        // MY CODE: Add FLAGs to switch intersection methods
         incoming = sample_lights(
-            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
+            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
+            params.quads_as_patches);
       }
       if (incoming == vec3f{0, 0, 0}) break;
       weight *=
           eval_scattering(vsdf, outgoing, incoming) /
           (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+              // MY CODE: Add FLAGs to switch intersection methods
+              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
+              params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -817,8 +865,12 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      auto position = eval_shading_position(scene, intersection, outgoing);
-      auto normal   = eval_shading_normal(scene, intersection, outgoing);
+      // MY CODE: Add FLAGs to switch intersection methods
+      auto position = eval_shading_position(scene, intersection, outgoing, 
+          params.quads_as_patches);
+      // MY CODE: Add FLAGs to switch intersection methods
+      auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+          params.quads_as_patches);
       auto material = eval_material(scene, intersection);
 
       // correct roughness
@@ -852,14 +904,17 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
       if (!is_delta(material)) {
         // direct with MIS --- light
         for (auto sample_light : {true, false}) {
+          // MY CODE: Add FLAGs to switch intersection methods
           incoming = sample_light ? sample_lights(scene, lights, position,
-                                        rand1f(rng), rand1f(rng), rand2f(rng))
+                                        rand1f(rng), rand1f(rng), rand2f(rng), 
+                                        params.quads_as_patches)
                                   : sample_bsdfcos(material, normal, outgoing,
                                         rand1f(rng), rand2f(rng));
           if (incoming == vec3f{0, 0, 0}) break;
           auto bsdfcos   = eval_bsdfcos(material, normal, outgoing, incoming);
-          auto light_pdf = sample_lights_pdf(
-              scene, bvh, lights, position, incoming);
+          // MY CODE: Add FLAGs to switch intersection methods
+          auto light_pdf = sample_lights_pdf(scene, bvh, lights, position, 
+              incoming, params.quads_as_patches);
           auto bsdf_pdf = sample_bsdfcos_pdf(
               material, normal, outgoing, incoming);
           auto mis_weight = sample_light
@@ -876,11 +931,13 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
               auto material = eval_material(scene,
                   scene.instances[intersection.instance], intersection.element,
                   intersection.uv);
-              emission      = eval_emission(material,
-                       eval_shading_normal(scene,
-                           scene.instances[intersection.instance],
-                           intersection.element, intersection.uv, -incoming),
-                       -incoming);
+              emission = eval_emission(material,
+                  eval_shading_normal(scene,
+                      scene.instances[intersection.instance],
+                      intersection.element, intersection.uv, -incoming,
+                      // MY CODE: Add FLAGs to switch intersection methods
+                      params.quads_as_patches),
+                  -incoming);
             }
             radiance += weight * bsdfcos * emission * mis_weight;
           }
@@ -922,14 +979,18 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
         incoming = sample_scattering(vsdf, outgoing, rand1f(rng), rand2f(rng));
         next_emission = true;
       } else {
+        // MY CODE: Add FLAGs to switch intersection methods
         incoming = sample_lights(
-            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
+            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
+            params.quads_as_patches);
         next_emission = true;
       }
       weight *=
           eval_scattering(vsdf, outgoing, incoming) /
           (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+              // MY CODE: Add FLAGs to switch intersection methods
+              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
+              params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -975,8 +1036,12 @@ static trace_result trace_pathtest(const scene_data& scene,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    auto position = eval_shading_position(scene, intersection, outgoing);
-    auto normal   = eval_shading_normal(scene, intersection, outgoing);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto position = eval_shading_position(scene, intersection, outgoing, 
+        params.quads_as_patches);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+        params.quads_as_patches);
     auto material = eval_material(scene, intersection);
     material.type = material_type::matte;
 
@@ -997,14 +1062,18 @@ static trace_result trace_pathtest(const scene_data& scene,
         incoming = sample_bsdfcos(
             material, normal, outgoing, rand1f(rng), rand2f(rng));
       } else {
+        // MY CODE: Add FLAGs to switch intersection methods
         incoming = sample_lights(
-            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
+            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
+            params.quads_as_patches);
       }
       if (incoming == vec3f{0, 0, 0}) break;
       weight *=
           eval_bsdfcos(material, normal, outgoing, incoming) /
           (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+              // MY CODE: Add FLAGs to switch intersection methods
+              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming,
+              params.quads_as_patches));
     } else {
       incoming = sample_delta(material, normal, outgoing, rand1f(rng));
       weight *= eval_delta(material, normal, outgoing, incoming) /
@@ -1053,8 +1122,12 @@ static trace_result trace_naive(const scene_data& scene, const trace_bvh& bvh,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    auto position = eval_shading_position(scene, intersection, outgoing);
-    auto normal   = eval_shading_normal(scene, intersection, outgoing);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto position = eval_shading_position(scene, intersection, outgoing, 
+        params.quads_as_patches);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+        params.quads_as_patches);
     auto material = eval_material(scene, intersection);
 
     // handle opacity
@@ -1132,8 +1205,12 @@ static trace_result trace_eyelight(const scene_data& scene,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    auto position = eval_shading_position(scene, intersection, outgoing);
-    auto normal   = eval_shading_normal(scene, intersection, outgoing);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto position = eval_shading_position(scene, intersection, outgoing, 
+        params.quads_as_patches);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+        params.quads_as_patches);
     auto material = eval_material(scene, intersection);
 
     // handle opacity
@@ -1201,8 +1278,12 @@ static trace_result trace_diagram(const scene_data& scene, const trace_bvh& bvh,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    auto position = eval_shading_position(scene, intersection, outgoing);
-    auto normal   = eval_shading_normal(scene, intersection, outgoing);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto position = eval_shading_position(scene, intersection, outgoing, 
+        params.quads_as_patches);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+        params.quads_as_patches);
     auto material = eval_material(scene, intersection);
 
     // handle opacity
@@ -1278,8 +1359,12 @@ static trace_result trace_furnace(const scene_data& scene, const trace_bvh& bvh,
     auto& instance = scene.instances[intersection.instance];
     auto  element  = intersection.element;
     auto  uv       = intersection.uv;
-    auto  position = eval_position(scene, instance, element, uv);
-    auto  normal = eval_shading_normal(scene, instance, element, uv, outgoing);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto  position = eval_position(scene, instance, element, uv, 
+        params.quads_as_patches);
+    // MY CODE: Add FLAGs to switch intersection methods
+    auto  normal = eval_shading_normal(scene, instance, element, uv, outgoing, 
+        params.quads_as_patches);
     auto  material = eval_material(scene, instance, element, uv);
 
     // handle opacity
@@ -1347,9 +1432,15 @@ static trace_result trace_falsecolor(const scene_data& scene,
 
   // prepare shading point
   auto outgoing = -ray.d;
-  auto position = eval_shading_position(scene, intersection, outgoing);
-  auto normal   = eval_shading_normal(scene, intersection, outgoing);
-  auto gnormal  = eval_element_normal(scene, intersection);
+  // MY CODE: Add FLAGs to switch intersection methods
+  auto position = eval_shading_position(scene, intersection, outgoing, 
+      params.quads_as_patches);
+  // MY CODE: Add FLAGs to switch intersection methods
+  auto normal   = eval_shading_normal(scene, intersection, outgoing, 
+      params.quads_as_patches);
+  // MY CODE: Add FLAGs to switch intersection methods
+  auto gnormal  = eval_element_normal(scene, intersection, 
+      params.quads_as_patches);
   auto texcoord = eval_texcoord(scene, intersection);
   auto material = eval_material(scene, intersection);
   auto delta    = is_delta(material) ? 1.0f : 0.0f;

@@ -286,7 +286,7 @@ namespace yocto {
 
 // Eval position
 vec3f eval_position(const scene_data& scene, const instance_data& instance,
-    int element, const vec2f& uv) {
+    int element, const vec2f& uv, const bool quads_as_patches) {
   auto& shape = scene.shapes[instance.shape];
   if (!shape.triangles.empty()) {
     auto t = shape.triangles[element];
@@ -297,7 +297,7 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
     auto q = shape.quads[element];
 
     // MY CODE: Check which intersection method to use
-    auto quads_as_patches = true; // TEMPORARY
+    // auto quads_as_patches = true; // TEMPORARY
     if (quads_as_patches){
       // NOTE: Use bilinear patches intersection
       // q01 ----------- q11
@@ -336,7 +336,8 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
 
 // Shape element normal.
 vec3f eval_element_normal(
-    const scene_data& scene, const instance_data& instance, int element) {
+    const scene_data& scene, const instance_data& instance, int element, 
+    const bool quads_as_patches) {
   auto& shape = scene.shapes[instance.shape];
   if (!shape.triangles.empty()) {
     auto t = shape.triangles[element];
@@ -347,7 +348,7 @@ vec3f eval_element_normal(
     auto q = shape.quads[element];
 
     // MY CODE: Check which intersection method to use
-    auto quads_as_patches = true;  // TEMPORARY
+    // auto quads_as_patches = true;  // TEMPORARY
 
     if (quads_as_patches){
       // NOTE: Use bilinear patches intersection
@@ -374,13 +375,13 @@ vec3f eval_element_normal(
 
 // Eval normal
 vec3f eval_normal(const scene_data& scene, const instance_data& instance,
-    int element, const vec2f& uv) {
+    int element, const vec2f& uv, const bool quads_as_patches) {
   auto& shape = scene.shapes[instance.shape];
 
   // MY CODE: compute geometric normal in case there aren't precomputed normals 
   // if (shape.normals.empty())
   if (shape.normals.empty() && shape.quads.empty())
-    return eval_element_normal(scene, instance, element);
+    return eval_element_normal(scene, instance, element, quads_as_patches);
 
   if (!shape.triangles.empty()) {
     auto t = shape.triangles[element];
@@ -391,7 +392,7 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
     auto q = shape.quads[element];
 
     // MY CODE: Check which intersection method to use
-    auto quads_as_patches = true;  // TEMPORARY
+    // auto quads_as_patches = true;  // TEMPORARY
 
     if (quads_as_patches) {
       // NOTE: Use bilinear patches intersection
@@ -518,11 +519,11 @@ pair<vec3f, vec3f> eval_element_tangents(
 }
 
 vec3f eval_normalmap(const scene_data& scene, const instance_data& instance,
-    int element, const vec2f& uv) {
+    int element, const vec2f& uv, const bool quads_as_patches) {
   auto& shape    = scene.shapes[instance.shape];
   auto& material = scene.materials[instance.material];
   // apply normal mapping
-  auto normal   = eval_normal(scene, instance, element, uv);
+  auto normal   = eval_normal(scene, instance, element, uv, quads_as_patches);
   auto texcoord = eval_texcoord(scene, instance, element, uv);
   if (material.normal_tex != invalidid &&
       (!shape.triangles.empty() || !shape.quads.empty())) {
@@ -542,12 +543,12 @@ vec3f eval_normalmap(const scene_data& scene, const instance_data& instance,
 // Eval shading position
 vec3f eval_shading_position(const scene_data& scene,
     const instance_data& instance, int element, const vec2f& uv,
-    const vec3f& outgoing) {
+    const vec3f& outgoing, const bool quads_as_patches) {
   auto& shape = scene.shapes[instance.shape];
   if (!shape.triangles.empty() || !shape.quads.empty()) {
-    return eval_position(scene, instance, element, uv);
+    return eval_position(scene, instance, element, uv, quads_as_patches);
   } else if (!shape.lines.empty()) {
-    return eval_position(scene, instance, element, uv);
+    return eval_position(scene, instance, element, uv, quads_as_patches);
   } else if (!shape.points.empty()) {
     return eval_position(shape, element, uv);
   } else {
@@ -558,18 +559,18 @@ vec3f eval_shading_position(const scene_data& scene,
 // Eval shading normal
 vec3f eval_shading_normal(const scene_data& scene,
     const instance_data& instance, int element, const vec2f& uv,
-    const vec3f& outgoing) {
+    const vec3f& outgoing, const bool quads_as_patches) {
   auto& shape    = scene.shapes[instance.shape];
   auto& material = scene.materials[instance.material];
   if (!shape.triangles.empty() || !shape.quads.empty()) {
-    auto normal = eval_normal(scene, instance, element, uv);
+    auto normal = eval_normal(scene, instance, element, uv, quads_as_patches);
     if (material.normal_tex != invalidid) {
-      normal = eval_normalmap(scene, instance, element, uv);
+      normal = eval_normalmap(scene, instance, element, uv, quads_as_patches);
     }
     if (material.type == material_type::refractive) return normal;
     return dot(normal, outgoing) >= 0 ? normal : -normal;
   } else if (!shape.lines.empty()) {
-    auto normal = eval_normal(scene, instance, element, uv);
+    auto normal = eval_normal(scene, instance, element, uv, quads_as_patches);
     return orthonormalize(outgoing, normal);
   } else if (!shape.points.empty()) {
     return outgoing;
