@@ -834,7 +834,98 @@ inline prim_intersection intersect_quad(const ray3f& ray, const vec3f& p0,
   return isec1.distance < isec2.distance ? isec1 : isec2;
 }
 
+// MY CODE: Intersect a ray with a bilinear patch.
+inline prim_intersection intersect_patch(const ray3f& ray, const vec3f& p0,
+    const vec3f& p1, const vec3f& p2, const vec3f& p3) {
+  // NOTE: I decided to 'rename' the parameters to match the code of the
+  // paper, I didn't use the names q00, q01, q11, q10 directly to respect the
+  // style of the intersect_quad function
+  vec3f q00 = p0;
+  vec3f q10 = p1;
+  vec3f q11 = p2;
+  vec3f q01 = p3;
+  // q01---------------q11
+  // |                   |
+  // | e00           e11 |  we precompute
+  // |        e10        |  qn = cross(q10-q00,q01-q11)
+  // q00---------------q10
 
+  vec3f e10 = q10 - q00;
+  vec3f e11 = q11 - q10;
+  vec3f e00 = q01 - q00;
+  vec3f qn  = cross(q10 - q00, q01 - q11);
+
+  q00 -= ray.o;
+  q10 -= ray.o;
+
+  // the equation is: a + b u + c u^2, first compute a+b+c and then b
+  float a = dot(cross(q00, ray.d), e00);
+  float c = dot(qn, ray.d);
+  float b = dot(cross(q10, ray.d), e11);
+  b -= a + c;
+
+  float det = b * b - 4 * a * c;
+  // see the right part of Figure 5
+  if (det < 0) return {};
+
+  // we -use_fast_math in CUDA_NVRTC_OPTIONS
+  det = sqrt(det);
+  // two roots (u parameter)
+  float u1, u2;
+  float t = ray.tmax, u, v;
+
+  // if c == 0, it is a trapezoid  and there is only one root (c != 0 in
+  // Stanford models) numerically "stable" root Viete's formula for u1*u2
+  if (c == 0) {
+    u1 = -a / b;
+    u2 = -1;
+  } else {
+    u1 = (-b - copysignf(det, b)) / 2;
+    u2 = a / u1;
+    u1 /= c;
+  }
+
+  // is it inside the patch?
+  if (0 <= u1 && u1 <= 1) {
+    // point on edge e10 (Fig. 4)
+    vec3f pa = lerp(q00, q10, u1);
+    vec3f pb = lerp(e00, e11, u1);  // it is, actually, pb - pa
+    vec3f n  = cross(ray.d, pb);
+    det      = dot(n, n);
+    n        = cross(n, pa);
+    float t1 = dot(n, pb);
+    float v1 = dot(n, ray.d);
+    // no need to check t1 < t
+    // if t1 > ray.tmax,
+    if (t1 > 0 && 0 <= v1 && v1 <= det) {
+      t = t1 / det;
+      u = u1;
+      v = v1 / det;  // it will be rejected
+    }                // in rtPotentialIntersection
+  }
+
+  // it is slightly different,
+  if (0 <= u2 && u2 <= 1) {
+    vec3f pa = lerp(q00, q10, u2);  // since u1 might be good
+    vec3f pb = lerp(e00, e11, u2);  // and we need 0 < t2 < t1
+    vec3f n  = cross(ray.d, pb);
+    det      = dot(n, n);
+    n        = cross(n, pa);
+    float t2 = dot(n, pb) / det;
+    float v2 = dot(n, ray.d);
+    if (0 <= v2 && v2 <= det && t > t2 && t2 > 0) {
+      t = t2;
+      u = u2;
+      v = v2 / det;
+    }
+  }
+
+  auto hit = false;
+
+  if (t > ray.tmin && t < ray.tmax) hit = true;
+
+  return {{u, v}, t, hit};
+}
 
 // Intersect a ray with a axis-aligned bounding box
 inline bool intersect_bbox(const ray3f& ray, const bbox3f& bbox) {
