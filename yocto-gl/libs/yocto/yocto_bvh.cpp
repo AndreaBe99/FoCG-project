@@ -543,9 +543,7 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
                 shape.positions[q.z], shape.positions[q.w]) 
             : intersect_quad(ray, shape.positions[q.x], shape.positions[q.y], 
                 shape.positions[q.z], shape.positions[q.w]);
-
-        // auto  pintersection = intersect_quad(ray, shape.positions[q.x], 
-        // shape.positions[q.y], shape.positions[q.z], shape.positions[q.w]);
+                
         if (!pintersection.hit) continue;
         intersection = {bvh.primitives[idx], pintersection.uv,
             pintersection.distance, true};
