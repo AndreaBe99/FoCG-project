@@ -78,6 +78,12 @@ void run(const vector<string>& args) {
   add_option(cli, "embreebvh", params.embreebvh, "use Embree bvh");
   add_option(cli, "highqualitybvh", params.highqualitybvh, "high quality bvh");
   add_option(cli, "noparallel", params.noparallel, "disable threading");
+
+  // MY CODE: Add FLAGs to switch intersection methods
+  add_option(cli, "points", params.points_as_spheres, "points as spheres");
+  add_option(cli, "lines", params.lines_as_cones, "lines as cones");
+  add_option(cli, "quads", params.quads_as_patches, "quads as patches");
+
   add_option(cli, "dumpparams", dumpname, "dump params filename");
   add_option(cli, "edit", edit, "edit interactively");
   parse_cli(cli, args);
