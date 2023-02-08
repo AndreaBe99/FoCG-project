@@ -303,6 +303,11 @@ bool draw_trace_widgets(const gui_input& input, int sample,
     edited += draw_gui_checkbox("filter", params.tentfilter);
     edited += draw_gui_slider("pratio", params.pratio, 1, 64);
     edited += draw_gui_checkbox("denoise", params.denoise);
+
+    // MY CODE: Add FLAGS for the different approaches of the project
+    edited += draw_gui_checkbox("points as spheres", params.points_as_spheres);
+    edited += draw_gui_checkbox("lines as rounded cones", params.lines_as_cones);
+    edited += draw_gui_checkbox("quads as bilinear patches", params.quads_as_patches);
     end_gui_header();
   }
   return (bool)edited;
