@@ -498,6 +498,10 @@ struct shape_intersection {
   vec2f uv       = {0, 0};
   float distance = 0;
   bool  hit      = false;
+
+  // MY CODE: Add position and normal, to return them in the intersection call.
+  vec3f position = {0, 0, 0};
+  vec3f normal   = {0, 0, 1};
 };
 
 // Make shape bvh
