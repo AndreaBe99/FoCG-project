@@ -99,18 +99,30 @@ struct scene_intersection {
   vec2f uv       = {0, 0};
   float distance = 0;
   bool  hit      = false;
+
+  // MY CODE: Add position and normal, to return them in the intersection call.
+  vec3f position = {0, 0, 0};
+  vec3f normal   = {0, 0, 1};
 };
 
 // Intersect ray with a bvh returning either the first or any intersection
 // depending on `find_any`. Returns the ray distance , the instance id,
 // the shape element index and the element barycentric coordinates.
+// MY CODE: Add FLAGs to switch intersection methods
 shape_intersection intersect_shape_bvh(const shape_bvh& bvh,
-    const shape_data& shape, const ray3f& ray, bool find_any = false);
+    const shape_data& shape, const ray3f& ray, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches,
+    bool find_any = false);
+// MY CODE: Add FLAGs to switch intersection methods
 scene_intersection intersect_scene_bvh(const scene_bvh& bvh,
-    const scene_data& scene, const ray3f& ray, bool find_any = false);
+    const scene_data& scene, const ray3f& ray, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches,
+    bool find_any = false);
+// MY CODE: Add FLAGs to switch intersection methods
 scene_intersection intersect_instance_bvh(const scene_bvh& bvh,
     const scene_data& scene, int instance, const ray3f& ray,
-    bool find_any = false);
+    const bool points_as_spheres, const bool lines_as_cones,
+    const bool quads_as_patches, bool find_any = false);
 
 // Find a shape element that overlaps a point within a given distance
 // max distance, returning either the closest or any overlap depending on
@@ -199,18 +211,29 @@ using bvh_scene [[deprecated]] = scene_bvh;
 }
 
 // backward compatibility
+// MY CODE: Add FLAGs to switch intersection methods
 [[deprecated]] inline shape_intersection intersect_bvh(const shape_bvh& bvh,
-    const shape_data& shape, const ray3f& ray, bool find_any = false) {
-  return intersect_shape_bvh(bvh, shape, ray, find_any);
+    const shape_data& shape, const ray3f& ray, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches,
+    bool find_any = false) {
+  return intersect_shape_bvh(bvh, shape, ray, points_as_spheres, lines_as_cones,
+      quads_as_patches, find_any);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[deprecated]] inline scene_intersection intersect_bvh(const scene_bvh& bvh,
-    const scene_data& scene, const ray3f& ray, bool find_any = false) {
-  return intersect_scene_bvh(bvh, scene, ray, find_any);
+    const scene_data& scene, const ray3f& ray, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches,
+    bool find_any = false) {
+  return intersect_scene_bvh(bvh, scene, ray, points_as_spheres, lines_as_cones,
+      quads_as_patches, find_any);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[deprecated]] inline scene_intersection intersect_bvh(const scene_bvh& bvh,
     const scene_data& scene, int instance, const ray3f& ray,
-    bool find_any = false) {
-  return intersect_instance_bvh(bvh, scene, instance, ray, find_any);
+    const bool points_as_spheres, const bool lines_as_cones,
+    const bool quads_as_patches, bool find_any = false) {
+  return intersect_instance_bvh(bvh, scene, instance, ray, points_as_spheres,
+      lines_as_cones, quads_as_patches, find_any);
 }
 
 // backward compatibility
@@ -226,18 +249,28 @@ using bvh_scene [[deprecated]] = scene_bvh;
 }
 
 // backward compatibility
+// MY CODE: Add FLAGs to switch intersection methods
 [[deprecated]] inline shape_intersection intersect_shape(const shape_bvh& bvh,
-    const shape_data& shape, const ray3f& ray, bool find_any = false) {
-  return intersect_shape_bvh(bvh, shape, ray, find_any);
+    const shape_data& shape, const ray3f& ray, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches,
+    bool find_any = false) {
+  return intersect_shape_bvh(bvh, shape, ray, points_as_spheres, lines_as_cones,
+      quads_as_patches, find_any);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[deprecated]] inline scene_intersection intersect_scene(const scene_bvh& bvh,
-    const scene_data& scene, const ray3f& ray, bool find_any) {
-  return intersect_scene_bvh(bvh, scene, ray, find_any);
+    const scene_data& scene, const ray3f& ray, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches, bool find_any) {
+  return intersect_scene_bvh(bvh, scene, ray, points_as_spheres, lines_as_cones,
+      quads_as_patches, find_any);
 }
+// MY CODE: Add FLAGs to switch intersection methods
 [[deprecated]] inline scene_intersection intersect_instance(
     const scene_bvh& bvh, const scene_data& scene, int instance,
-    const ray3f& ray, bool find_any) {
-  return intersect_instance_bvh(bvh, scene, instance, ray, find_any);
+    const ray3f& ray, const bool points_as_spheres, const bool lines_as_cones,
+    const bool quads_as_patches, bool find_any) {
+  return intersect_instance_bvh(bvh, scene, instance, ray, points_as_spheres,
+      lines_as_cones, quads_as_patches, find_any);
 }
 
 // backward compatibility
