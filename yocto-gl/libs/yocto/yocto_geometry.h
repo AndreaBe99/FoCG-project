@@ -143,6 +143,11 @@ struct ray3f {
 inline vec2f ray_point(const ray2f& ray, float t);
 inline vec3f ray_point(const ray3f& ray, float t);
 
+// MY CODE
+// Computes u and v, with u as in intersect_line, and v as in intersect_sphere
+inline vec2f compute_uv(
+    const ray3f& ray, const vec3f& pa, const vec3f& pb, const vec3f& normal);
+
 }  // namespace yocto
 
 // -----------------------------------------------------------------------------
@@ -285,6 +290,10 @@ struct prim_intersection {
   vec2f uv       = {0, 0};
   float distance = flt_max;
   bool  hit      = false;
+
+  // MY CODE: Add position and normal, to return them in the intersection call.
+  vec3f position = {0, 0, 0};
+  vec3f normal   = {0, 0, 1};
 };
 
 // Intersect a ray with a point (approximate)
@@ -426,6 +435,30 @@ namespace yocto {
 // Computes a point on a ray
 inline vec2f ray_point(const ray2f& ray, float t) { return ray.o + ray.d * t; }
 inline vec3f ray_point(const ray3f& ray, float t) { return ray.o + ray.d * t; }
+
+// MY CODE
+inline vec2f compute_uv(
+    const ray3f& ray, const vec3f& pa, const vec3f& pb, const vec3f& normal) {
+  // NOTE: compute u as in the line intersection
+  // setup intersection params
+  auto iu = ray.d;
+  auto iv = pb - pa;
+  auto iw = ray.o - pa;
+  // compute values to solve a linear system
+  auto  a   = dot(iu, iu);
+  auto  b   = dot(iu, iv);
+  auto  c   = dot(iv, iv);
+  auto  d   = dot(iu, iw);
+  auto  e   = dot(iv, iw);
+  float det = a * c - b * b;
+  // compute u
+  float u = clamp((a * e - b * d) / det, 0.f, 1.f);
+
+  // NOTE: compute v as in the sphere intersection
+  float v = acos(clamp(normal.z, -1.0f, 1.0f)) / pif;
+
+  return {u, v};
+}
 
 }  // namespace yocto
 
@@ -757,7 +790,7 @@ inline prim_intersection intersect_line(
 }
 
 // Intersect a ray with a sphere
-inline prim_intersection intersect_sphere(
+inline prim_intersection intersect_sphere_default(
     const ray3f& ray, const vec3f& p, float r) {
   // compute parameters
   auto a = dot(ray.d, ray.d);
@@ -788,6 +821,128 @@ inline prim_intersection intersect_sphere(
 
   // intersection occurred: set params and exit
   return {{u, v}, t, true};
+}
+
+// MY CODE
+// Intersect a ray with a sphere
+inline prim_intersection intersect_sphere(
+    const ray3f& ray, const vec3f& p, float r) {
+  // NOTE: ispiration from
+  // https://bgolus.medium.com/rendering-a-sphere-on-a-quad-13c92025570c p is
+  // the center of the sphere r is the radius of the sphere
+  vec3f oc = ray.o - p;
+  float b  = dot(oc, ray.d);
+  float c  = dot(oc, oc) - r * r;
+
+  // check discriminant
+  float h = b * b - c;
+  // no intersection
+  if (h < 0.0) return {};
+
+  h = sqrt(h);
+
+  // NOTE: the length of the ray from the origin to the sphere surface
+  // auto ta = -b - h;
+  // auto tb = -b + h;
+  // NOTE: use the sign of the discriminant to determine which side of
+  // the intersection is the correct one
+  auto t = -b - sign(c) * h;
+
+  // exit if not within bounds
+  if (t < ray.tmin || t > ray.tmax) return {};
+
+  // Compute position and normal
+  auto position = ray_point(ray, t);
+  auto normal   = normalize((position - p) / r);
+
+  // Compute uv
+  // NOTE: atan returns a value between -pi and pi
+  // so we divide by pi * 2 to get -0.5 to 0.5
+  auto u = atan2(normal.y, normal.x) / (2 * pif);
+  if (u < 0) u += 1;
+  // NOTE: acos returns 0.0 at the top, pi at the bottom
+  auto v = acos(clamp(normal.z, -1.0f, 1.0f)) / pif;
+
+  //auto u = 0.5 + ( atan2(normal.z, normal.x) / (2 * pif) );
+  //auto v = 0.5 + ( asin(normal.y) / pif );
+
+  return {{u, v}, t, true, position, normal};
+}
+
+// MY CODE
+// Intersect a ray with a rounded cone
+inline prim_intersection intersect_cone(
+    const ray3f& ray, const vec3f& p0, const vec3f& p1, float r0, float r1) {
+  // NOTE: cone defined by extremes pa and pb, and radious ra and rb.
+  // ray.o is the ray origin
+  // ray.d is the ray direction
+  vec3f ba = p1 - p0;
+  vec3f oa = ray.o - p0;
+  vec3f ob = ray.o - p1;
+  float rr = r0 - r1;
+  float m0 = dot(ba, ba);
+  float m1 = dot(ba, oa);
+  float m2 = dot(ba, ray.d);
+  float m3 = dot(ray.d, oa);
+  float m5 = dot(oa, oa);
+  float m6 = dot(ob, ray.d);
+  float m7 = dot(ob, ob);
+
+  // body
+  float d2 = m0 - rr * rr;
+
+  float k2 = d2 - m2 * m2;
+  float k1 = d2 * m3 - m1 * m2 + m2 * rr * r0;
+  float k0 = d2 * m5 - m1 * m1 + m1 * rr * r0 * 2.0 - m0 * r0 * r0;
+
+  float h = k1 * k1 - k0 * k2;
+
+  if (h < 0.0) return {};
+
+  float t = (-sqrt(h) - k1) / k2;
+  if (t < 0.0) return {};
+
+  float y = m1 - r0 * rr + t * m2;
+  if (y > 0.0 && y < d2) {
+    // check if the intersection is within the bounds of the cone
+    if (t < ray.tmin || t > ray.tmax) return {};
+    // compute position and normal
+    vec3f position = ray_point(ray, t);
+    vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
+    // compute u and v
+    vec2f uv = compute_uv(ray, p0, p1, normal);
+    return {uv, t, true, position, normal};
+  }
+
+  // caps
+  float h1 = m3 * m3 - m5 + r0 * r0;
+  float h2 = m6 * m6 - m7 + r1 * r1;
+
+  if (max(h1, h2) < 0.0) return {};
+
+  auto  r      = 1e20f;
+  vec3f normal = {0, 0, 0};
+
+  if (h1 > 0.0) {
+    r = -m3 - sqrt(h1);
+    normal = (oa + t * ray.d) / r0;
+  }
+  if (h2 > 0.0) {
+    t = -m6 - sqrt(h2);
+    if (t < r) {
+      r = t;
+      normal = (ob + t * ray.d) / r1;
+    }
+  }
+  if (r < ray.tmin || r > ray.tmax) return {};
+
+  // compute position and normal
+  vec3f position = ray_point(ray, t);
+  // compute u and v
+  vec2f uv = compute_uv(ray, p0, p1, normal); 
+
+  // intersection occurred: set params and exit
+  return {uv, r, true, position, normal};
 }
 
 // Intersect a ray with a triangle
