@@ -379,7 +379,13 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
   auto& shape = scene.shapes[instance.shape];
 
   // MY CODE: compute geometric normal in case there aren't precomputed normals 
-  // if (shape.normals.empty())
+  if (shape.normals.empty()){
+    if (!quads_as_patches)
+      return eval_element_normal(scene, instance, element, quads_as_patches);
+    else if (quads_as_patches && shape.quads.empty()) 
+      return eval_element_normal(scene, instance, element, quads_as_patches);
+  }
+  
   if (shape.normals.empty() && shape.quads.empty())
     return eval_element_normal(scene, instance, element, quads_as_patches);
 
