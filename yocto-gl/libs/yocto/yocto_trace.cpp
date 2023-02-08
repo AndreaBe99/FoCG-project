@@ -97,20 +97,26 @@ trace_bvh make_trace_bvh(const scene_data& scene, const trace_params& params) {
 
 // Ray-intersection shortcuts
 static scene_intersection intersect_scene(const trace_bvh& bvh,
-    const scene_data& scene, const ray3f& ray, bool find_any = false) {
+    const scene_data& scene, const ray3f& ray, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches, 
+    bool find_any = false) {
   if (bvh.ebvh.ebvh) {
     return intersect_scene_ebvh(bvh.ebvh, scene, ray, find_any);
   } else {
-    return intersect_scene_bvh(bvh.bvh, scene, ray, find_any);
+    return intersect_scene_bvh(bvh.bvh, scene, ray, points_as_spheres,
+        lines_as_cones, quads_as_patches, find_any);
   }
 }
 static scene_intersection intersect_instance(const trace_bvh& bvh,
     const scene_data& scene, int instance, const ray3f& ray,
-    bool find_any = false) {
+    const bool points_as_spheres, const bool lines_as_cones,
+    const bool quads_as_patches, bool find_any = false) {
   if (bvh.ebvh.ebvh) {
     return intersect_instance_ebvh(bvh.ebvh, scene, instance, ray, find_any);
   } else {
-    return intersect_instance_bvh(bvh.bvh, scene, instance, ray, find_any);
+    return intersect_instance_bvh(
+        bvh.bvh, scene, instance, ray, points_as_spheres, lines_as_cones, 
+        quads_as_patches, find_any);
   }
 }
 
@@ -404,7 +410,8 @@ static vec3f sample_lights(const scene_data& scene, const trace_lights& lights,
 // MY CODE: Add FLAGs to switch intersection methods
 // Sample lights pdf
 static float sample_lights_pdf(const scene_data& scene, const trace_bvh& bvh,
-    const trace_lights& lights, const vec3f& position, const vec3f& direction, 
+    const trace_lights& lights, const vec3f& position, const vec3f& direction,
+    const bool points_as_spheres, const bool lines_as_cones, 
     const bool quads_as_patches) {
   auto pdf = 0.0f;
   for (auto& light : lights.lights) {
@@ -414,8 +421,10 @@ static float sample_lights_pdf(const scene_data& scene, const trace_bvh& bvh,
       auto lpdf          = 0.0f;
       auto next_position = position;
       for (auto bounce = 0; bounce < 100; bounce++) {
+        // MY CODE: Add FLAGs to switch intersection methods
         auto intersection = intersect_instance(
-            bvh, scene, light.instance, {next_position, direction});
+            bvh, scene, light.instance, {next_position, direction}, 
+            points_as_spheres, lines_as_cones, quads_as_patches);
         if (!intersection.hit) break;
         // accumulate pdf
         // MY CODE: Add FLAGs to switch intersection methods
@@ -485,7 +494,9 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray);
+    auto intersection = intersect_scene(bvh, scene, ray, 
+        params.points_as_spheres, params.lines_as_cones, 
+        params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -509,12 +520,30 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      // MY CODE: Add FLAGs to switch intersection methods
-      auto position = eval_shading_position(scene, intersection, outgoing, 
-          params.quads_as_patches);
-      // MY CODE: Add FLAGs to switch intersection methods
-      auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-          params.quads_as_patches);
+
+      // MY CODE: I decided to change the data to return the intersection normal
+      // and position directly from the intersection call, and not to modify the
+      // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+      vec3f position, normal;
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_direction(instance.frame, intersection.normal);
+      } else {
+        // MY CODE: Add FLAGs to switch intersection methods
+        position = eval_shading_position(
+            scene, intersection, outgoing, params.quads_as_patches);
+        normal = eval_shading_normal(
+            scene, intersection, outgoing, params.quads_as_patches);
+      }
+
       auto material = eval_material(scene, intersection);
 
       // correct roughness
@@ -560,6 +589,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
                 0.5f *
                     // MY CODE: Add FLAGs to switch intersection methods
                     sample_lights_pdf(scene, bvh, lights, position, incoming, 
+                    params.points_as_spheres, params.lines_as_cones,
                     params.quads_as_patches));
       } else {
         incoming = sample_delta(material, normal, outgoing, rand1f(rng));
@@ -605,6 +635,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
           (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
               // MY CODE: Add FLAGs to switch intersection methods
               0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
+              params.points_as_spheres, params.lines_as_cones,
               params.quads_as_patches));
 
       // setup next iteration
@@ -644,7 +675,8 @@ static trace_result trace_pathdirect(const scene_data& scene,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray);
+    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
+        params.lines_as_cones, params.quads_as_patches);
     if (!intersection.hit) {
       if ((bounce > 0 || !params.envhidden) && next_emission)
         radiance += weight * eval_environment(scene, ray.d);
@@ -668,12 +700,28 @@ static trace_result trace_pathdirect(const scene_data& scene,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      // MY CODE: Add FLAGs to switch intersection methods
-      auto position = eval_shading_position(scene, intersection, outgoing, 
-          params.quads_as_patches);
-      // MY CODE: Add FLAGs to switch intersection methods
-      auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-          params.quads_as_patches);
+      // MY CODE: I decided to change the data to return the intersection normal
+      // and position directly from the intersection call, and not to modify the
+      // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+      vec3f position, normal;
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_direction(instance.frame, intersection.normal);
+      } else {
+        // MY CODE: Add FLAGs to switch intersection methods
+        position = eval_shading_position(
+            scene, intersection, outgoing, params.quads_as_patches);
+        normal = eval_shading_normal(
+            scene, intersection, outgoing, params.quads_as_patches);
+      }
       auto material = eval_material(scene, intersection);
 
       // correct roughness
@@ -709,10 +757,14 @@ static trace_result trace_pathdirect(const scene_data& scene,
             params.quads_as_patches);
         // MY CODE: Add FLAGs to switch intersection methods
         auto pdf = sample_lights_pdf(scene, bvh, lights, position, incoming, 
+            params.points_as_spheres, params.lines_as_cones, 
             params.quads_as_patches);
         auto bsdfcos = eval_bsdfcos(material, normal, outgoing, incoming);
         if (bsdfcos != vec3f{0, 0, 0} && pdf > 0) {
-          auto intersection = intersect_scene(bvh, scene, {position, incoming});
+          // MY CODE: Add FLAGs to switch intersection methods
+          auto intersection = intersect_scene(bvh, scene, {position, incoming}, 
+              params.points_as_spheres, params.lines_as_cones, 
+              params.quads_as_patches);
           auto emission =
               !intersection.hit
                   ? eval_environment(scene, incoming)
@@ -751,7 +803,8 @@ static trace_result trace_pathdirect(const scene_data& scene,
                 0.5f *
                     // MY CODE: Add FLAGs to switch intersection methods
                     sample_lights_pdf(scene, bvh, lights, position, incoming, 
-                    params.quads_as_patches));
+                        params.points_as_spheres, params.lines_as_cones, 
+                        params.quads_as_patches));
       } else {
         incoming = sample_delta(material, normal, outgoing, rand1f(rng));
         if (incoming == vec3f{0, 0, 0}) break;
@@ -794,7 +847,8 @@ static trace_result trace_pathdirect(const scene_data& scene,
           (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
               // MY CODE: Add FLAGs to switch intersection methods
               0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
-              params.quads_as_patches));
+                  params.points_as_spheres, params.lines_as_cones, 
+                  params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -840,8 +894,10 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = next_emission ? intersect_scene(bvh, scene, ray)
-                                      : next_intersection;
+    auto intersection = next_emission 
+        ? intersect_scene(bvh, scene, ray, params.points_as_spheres, 
+            params.lines_as_cones, params.quads_as_patches)
+        : next_intersection;
     if (!intersection.hit) {
       if ((bounce > 0 || !params.envhidden) && next_emission)
         radiance += weight * eval_environment(scene, ray.d);
@@ -865,12 +921,29 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      // MY CODE: Add FLAGs to switch intersection methods
-      auto position = eval_shading_position(scene, intersection, outgoing, 
-          params.quads_as_patches);
-      // MY CODE: Add FLAGs to switch intersection methods
-      auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-          params.quads_as_patches);
+      // MY CODE: I decided to change the data to return the intersection normal
+      // and position directly from the intersection call, and not to modify the
+      // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+      vec3f position, normal;
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_direction(instance.frame, intersection.normal);
+      } else {
+        // MY CODE: Add FLAGs to switch intersection methods
+        position = eval_shading_position(
+            scene, intersection, outgoing, params.quads_as_patches);
+        normal = eval_shading_normal(
+            scene, intersection, outgoing, params.quads_as_patches);
+      }
+
       auto material = eval_material(scene, intersection);
 
       // correct roughness
@@ -914,15 +987,17 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
           auto bsdfcos   = eval_bsdfcos(material, normal, outgoing, incoming);
           // MY CODE: Add FLAGs to switch intersection methods
           auto light_pdf = sample_lights_pdf(scene, bvh, lights, position, 
-              incoming, params.quads_as_patches);
+              incoming, params.points_as_spheres, params.lines_as_cones, 
+              params.quads_as_patches);
           auto bsdf_pdf = sample_bsdfcos_pdf(
               material, normal, outgoing, incoming);
           auto mis_weight = sample_light
                                 ? mis_heuristic(light_pdf, bsdf_pdf) / light_pdf
                                 : mis_heuristic(bsdf_pdf, light_pdf) / bsdf_pdf;
           if (bsdfcos != vec3f{0, 0, 0} && mis_weight != 0) {
-            auto intersection = intersect_scene(
-                bvh, scene, {position, incoming});
+            auto intersection = intersect_scene( bvh, scene, 
+                {position, incoming}, params.points_as_spheres, 
+                params.lines_as_cones, params.quads_as_patches);
             if (!sample_light) next_intersection = intersection;
             auto emission = vec3f{0, 0, 0};
             if (!intersection.hit) {
@@ -990,7 +1065,8 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
           (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
               // MY CODE: Add FLAGs to switch intersection methods
               0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
-              params.quads_as_patches));
+                  params.points_as_spheres, params.lines_as_cones, 
+                  params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -1027,7 +1103,8 @@ static trace_result trace_pathtest(const scene_data& scene,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray);
+    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
+        params.lines_as_cones, params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1036,12 +1113,28 @@ static trace_result trace_pathtest(const scene_data& scene,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto position = eval_shading_position(scene, intersection, outgoing, 
-        params.quads_as_patches);
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-        params.quads_as_patches);
+    // MY CODE: I decided to change the data to return the intersection normal
+    // and position directly from the intersection call, and not to modify the
+    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    vec3f position, normal;
+    // NOTE: Like in the eval_position check if there is a shape, and then
+    // which method we are using, i.e.:
+    //  - points or points as spheres
+    //  - lines or lines as rounded cones
+    //  - quads or quads as bilinear patches
+    auto& instance = scene.instances[intersection.instance];
+    auto& shape    = scene.shapes[instance.shape];
+    if ((!shape.points.empty() && params.points_as_spheres) ||
+        (!shape.lines.empty() && params.lines_as_cones)) {
+      position = transform_point(instance.frame, intersection.position);
+      normal   = transform_direction(instance.frame, intersection.normal);
+    } else {
+      // MY CODE: Add FLAGs to switch intersection methods
+      position = eval_shading_position(
+          scene, intersection, outgoing, params.quads_as_patches);
+      normal = eval_shading_normal(
+          scene, intersection, outgoing, params.quads_as_patches);
+    }
     auto material = eval_material(scene, intersection);
     material.type = material_type::matte;
 
@@ -1073,6 +1166,7 @@ static trace_result trace_pathtest(const scene_data& scene,
           (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
               // MY CODE: Add FLAGs to switch intersection methods
               0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming,
+              params.points_as_spheres, params.lines_as_cones, 
               params.quads_as_patches));
     } else {
       incoming = sample_delta(material, normal, outgoing, rand1f(rng));
@@ -1113,7 +1207,8 @@ static trace_result trace_naive(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray);
+    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
+        params.lines_as_cones, params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1122,12 +1217,29 @@ static trace_result trace_naive(const scene_data& scene, const trace_bvh& bvh,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto position = eval_shading_position(scene, intersection, outgoing, 
-        params.quads_as_patches);
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-        params.quads_as_patches);
+    // MY CODE: I decided to change the data to return the intersection normal
+    // and position directly from the intersection call, and not to modify the
+    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    vec3f position, normal;
+    // NOTE: Like in the eval_position check if there is a shape, and then
+    // which method we are using, i.e.:
+    //  - points or points as spheres
+    //  - lines or lines as rounded cones
+    //  - quads or quads as bilinear patches
+    auto& instance = scene.instances[intersection.instance];
+    auto& shape    = scene.shapes[instance.shape];
+    if ((!shape.points.empty() && params.points_as_spheres) ||
+        (!shape.lines.empty() && params.lines_as_cones)) {
+      position = transform_point(instance.frame, intersection.position);
+      normal   = transform_direction(instance.frame, intersection.normal);
+    } else {
+      // MY CODE: Add FLAGs to switch intersection methods
+      position = eval_shading_position(
+          scene, intersection, outgoing, params.quads_as_patches);
+      normal = eval_shading_normal(
+          scene, intersection, outgoing, params.quads_as_patches);
+    }
+
     auto material = eval_material(scene, intersection);
 
     // handle opacity
@@ -1196,7 +1308,8 @@ static trace_result trace_eyelight(const scene_data& scene,
   // trace  path
   for (auto bounce = 0; bounce < max(params.bounces, 4); bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray);
+    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
+        params.lines_as_cones, params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1205,12 +1318,30 @@ static trace_result trace_eyelight(const scene_data& scene,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto position = eval_shading_position(scene, intersection, outgoing, 
-        params.quads_as_patches);
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-        params.quads_as_patches);
+
+    // MY CODE: I decided to change the data to return the intersection normal
+    // and position directly from the intersection call, and not to modify the
+    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    vec3f position, normal;
+    // NOTE: Like in the eval_position check if there is a shape, and then
+    // which method we are using, i.e.:
+    //  - points or points as spheres
+    //  - lines or lines as rounded cones
+    //  - quads or quads as bilinear patches
+    auto& instance = scene.instances[intersection.instance];
+    auto& shape    = scene.shapes[instance.shape];
+    if ((!shape.points.empty() && params.points_as_spheres) ||
+        (!shape.lines.empty() && params.lines_as_cones)) {
+      position = transform_point(instance.frame, intersection.position);
+      normal   = transform_direction(instance.frame, intersection.normal);
+    } else {
+      // MY CODE: Add FLAGs to switch intersection methods
+      position = eval_shading_position(
+          scene, intersection, outgoing, params.quads_as_patches);
+      normal = eval_shading_normal(
+          scene, intersection, outgoing, params.quads_as_patches);
+    }
+
     auto material = eval_material(scene, intersection);
 
     // handle opacity
@@ -1267,7 +1398,8 @@ static trace_result trace_diagram(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < max(params.bounces, 4); bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray);
+    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
+        params.lines_as_cones, params.quads_as_patches);
     if (!intersection.hit) {
       radiance += weight * vec3f{1, 1, 1};
       hit = true;
@@ -1278,12 +1410,28 @@ static trace_result trace_diagram(const scene_data& scene, const trace_bvh& bvh,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto position = eval_shading_position(scene, intersection, outgoing, 
-        params.quads_as_patches);
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-        params.quads_as_patches);
+    // MY CODE: I decided to change the data to return the intersection normal
+    // and position directly from the intersection call, and not to modify the
+    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    vec3f position, normal;
+    // NOTE: Like in the eval_position check if there is a shape, and then
+    // which method we are using, i.e.:
+    //  - points or points as spheres
+    //  - lines or lines as rounded cones
+    //  - quads or quads as bilinear patches
+    auto& instance = scene.instances[intersection.instance];
+    auto& shape    = scene.shapes[instance.shape];
+    if ((!shape.points.empty() && params.points_as_spheres) ||
+        (!shape.lines.empty() && params.lines_as_cones)) {
+      position = transform_point(instance.frame, intersection.position);
+      normal   = transform_direction(instance.frame, intersection.normal);
+    } else {
+      // MY CODE: Add FLAGs to switch intersection methods
+      position = eval_shading_position(
+          scene, intersection, outgoing, params.quads_as_patches);
+      normal = eval_shading_normal(
+          scene, intersection, outgoing, params.quads_as_patches);
+    }
     auto material = eval_material(scene, intersection);
 
     // handle opacity
@@ -1347,7 +1495,8 @@ static trace_result trace_furnace(const scene_data& scene, const trace_bvh& bvh,
     }
 
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray);
+    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
+        params.lines_as_cones, params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1359,12 +1508,27 @@ static trace_result trace_furnace(const scene_data& scene, const trace_bvh& bvh,
     auto& instance = scene.instances[intersection.instance];
     auto  element  = intersection.element;
     auto  uv       = intersection.uv;
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto  position = eval_position(scene, instance, element, uv, 
-        params.quads_as_patches);
-    // MY CODE: Add FLAGs to switch intersection methods
-    auto  normal = eval_shading_normal(scene, instance, element, uv, outgoing, 
-        params.quads_as_patches);
+    // MY CODE: I decided to change the data to return the intersection normal
+    // and position directly from the intersection call, and not to modify the
+    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    vec3f position, normal;
+    // NOTE: Like in the eval_position check if there is a shape, and then
+    // which method we are using, i.e.:
+    //  - points or points as spheres
+    //  - lines or lines as rounded cones
+    //  - quads or quads as bilinear patches
+    auto& shape    = scene.shapes[instance.shape];
+    if ((!shape.points.empty() && params.points_as_spheres) ||
+        (!shape.lines.empty() && params.lines_as_cones)) {
+      position = transform_point(instance.frame, intersection.position);
+      normal   = transform_direction(instance.frame, intersection.normal);
+    } else {
+      // MY CODE: Add FLAGs to switch intersection methods
+      position = eval_shading_position(
+          scene, intersection, outgoing, params.quads_as_patches);
+      normal = eval_shading_normal(
+          scene, intersection, outgoing, params.quads_as_patches);
+    }
     auto  material = eval_material(scene, instance, element, uv);
 
     // handle opacity
@@ -1427,17 +1591,35 @@ static trace_result trace_falsecolor(const scene_data& scene,
     const trace_bvh& bvh, const trace_lights& lights, const ray3f& ray,
     rng_state& rng, const trace_params& params) {
   // intersect next point
-  auto intersection = intersect_scene(bvh, scene, ray);
+  auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
+      params.lines_as_cones, params.quads_as_patches);
   if (!intersection.hit) return {};
 
   // prepare shading point
   auto outgoing = -ray.d;
-  // MY CODE: Add FLAGs to switch intersection methods
-  auto position = eval_shading_position(scene, intersection, outgoing, 
-      params.quads_as_patches);
-  // MY CODE: Add FLAGs to switch intersection methods
-  auto normal   = eval_shading_normal(scene, intersection, outgoing, 
-      params.quads_as_patches);
+  // MY CODE: I decided to change the data to return the intersection normal
+  // and position directly from the intersection call, and not to modify the
+  // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+  vec3f position, normal;
+  // NOTE: Like in the eval_position check if there is a shape, and then
+  // which method we are using, i.e.:
+  //  - points or points as spheres
+  //  - lines or lines as rounded cones
+  //  - quads or quads as bilinear patches
+  auto& instance = scene.instances[intersection.instance];
+  auto& shape    = scene.shapes[instance.shape];
+  if ((!shape.points.empty() && params.points_as_spheres) ||
+      (!shape.lines.empty() && params.lines_as_cones)) {
+    position = transform_point(instance.frame, intersection.position);
+    normal   = transform_direction(instance.frame, intersection.normal);
+  } else {
+    // MY CODE: Add FLAGs to switch intersection methods
+    position = eval_shading_position(
+        scene, intersection, outgoing, params.quads_as_patches);
+    normal = eval_shading_normal(
+        scene, intersection, outgoing, params.quads_as_patches);
+  }
+
   // MY CODE: Add FLAGs to switch intersection methods
   auto gnormal  = eval_element_normal(scene, intersection, 
       params.quads_as_patches);
