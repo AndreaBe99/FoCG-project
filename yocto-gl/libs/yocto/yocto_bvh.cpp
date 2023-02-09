@@ -559,7 +559,8 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
         // MY CODE: Check which intersection method to use
         auto pintersection = quads_as_patches 
             ? intersect_patch(ray, shape.positions[q.x], shape.positions[q.y], 
-                shape.positions[q.z], shape.positions[q.w]) 
+                shape.positions[q.z], shape.positions[q.w], shape.positions,
+                shape.normals, shape.quads, q) 
             : intersect_quad(ray, shape.positions[q.x], shape.positions[q.y], 
                 shape.positions[q.z], shape.positions[q.w]);
 
