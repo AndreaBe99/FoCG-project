@@ -296,7 +296,7 @@ struct prim_intersection {
 
   // MY CODE: Add position and normal, to return them in the intersection call.
   vec3f position = {0, 0, 0};
-  vec3f normal   = {0, 0, 1};
+  vec3f normal   = {0, 0, 0};
 };
 
 // Intersect a ray with a point (approximate)
@@ -852,18 +852,22 @@ inline prim_intersection intersect_sphere(
   if (t < ray.tmin || t > ray.tmax) return {};
 
   // Compute position and normal
-  // NOTE: inspiration from
-  // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection.html
+  // NOTE: inspiration from https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection.html
   auto position = ray_point(ray, t);
   auto normal   = normalize((position - p) / r);
 
   // Compute uv
-  // NOTE: atan returns a value between -pi and pi
-  // so we divide by pi * 2 to get -0.5 to 0.5
   auto u = atan2(normal.y, normal.x) / (2 * pif);
   if (u < 0) u += 1;
-  // NOTE: acos returns 0.0 at the top, pi at the bottom
   auto v = acos(clamp(normal.z, -1.0f, 1.0f)) / pif;
+
+  // NOTE: In this particular case, the normal is simular to a point on a unit 
+  // sphere centred around the origin. We can thus use the normal coordinates to
+  // compute the spherical coordinates of Phit. atan2 returns a value in the
+  // range [-pi, pi] and we need to remap it to range [0, 1] acosf returns a
+  // value in the range [0, pi] and we also need to remap it to the range [0, 1]
+  // auto u = (1 + atan2(normal.z, normal.x) / pif) * 0.5;
+  // auto v = acosf(normal.y) / pif;
 
   return {{u, v}, t, true, position, normal};
 }
@@ -1085,30 +1089,28 @@ inline prim_intersection intersect_patch(const ray3f& ray, const vec3f& p0,
   // because, previously, we have modified the values of q00 and q10
   q00 = p0;
   q10 = p1;
-  // TODO: check the following 2 line
-  // q11 = p2;
-  // q01 = p3;
-  auto position = (1 - u) * (1 - v) * q00 + u * (1 - v) * q10 + 
-                  (1 - u) * v * q01 + u * v * q11;
-  
+
+  // NOTE: From Cool Patches: A Geometric Approach to Ray/Bilinear Patch
+  // Intersections, Formula [1], page 2.
+  auto position = q00 * (1 - u) * (1 - v) + 
+                  q10 * u       * (1 - v) +
+                  q01 * (1 - u) * v + 
+                  q11 * u       * v;
+
   // compute normal
   auto normal = vec3f{0, 0, 0};
   if (shape_normals.empty()) {
-    // NOTE: compute geometric normal in case there aren't precomputed normals
-    if (shape_quads.empty()) {
-      // eval_element_normal
-      normal = normalize(cross(q10 - q00, q11 - q10));
-    } else {
       auto du = lerp(e10, q11 - q01, v);
       auto dv = lerp(e00, e11, u);
       normal  = cross(du, dv);
-    }
-    
   } else {
     normal = lerp(lerp(shape_normals[q.x], shape_normals[q.y], u),
                   lerp(shape_normals[q.w], shape_normals[q.z], u), v);
   }
-  
+  normal = normalize(normal);
+
+
+
   return {{u, v}, t, hit, position, normal};
 }
 

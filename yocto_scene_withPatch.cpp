@@ -289,7 +289,6 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
     int element, const vec2f& uv, const bool points_as_spheres,
     const bool lines_as_cones, const bool quads_as_patches) {
   auto& shape = scene.shapes[instance.shape];
-
   if (!shape.triangles.empty()) {
     auto t = shape.triangles[element];
     return transform_point(
@@ -299,9 +298,9 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
     auto q = shape.quads[element];
     
     // ORIGINAL CODE
-    /*return transform_point(instance.frame,
+    return transform_point(instance.frame,
         interpolate_quad(shape.positions[q.x], shape.positions[q.y],
-            shape.positions[q.z], shape.positions[q.w], uv));*/
+            shape.positions[q.z], shape.positions[q.w], uv));
             
     // MY CODE: Check which intersection method to use
     if (quads_as_patches){
@@ -328,64 +327,23 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
 
   } else if (!shape.lines.empty()) {
     auto l = shape.lines[element];
-
-    // ORIGINAL CODE
     return transform_point(instance.frame,
         interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
-
-    // MY CODE
-    /*auto& p0     = shape.positions[shape.lines[element].x];
-    auto& p1     = shape.positions[shape.lines[element].y];
-    auto& r0     = shape.radius[shape.lines[element].x];
-    auto& r1     = shape.radius[shape.lines[element].y];
-    auto  height = length(p1 - p0);
-    auto  p0p1   = normalize(p1 - p0);
-    auto  frame  = instance.frame * frame_fromz(p0, p0p1);
-
-    if (uv.x >= 0 && uv.x <= 1) {
-      auto r = lerp(r0, r1, uv.x);
-      auto p = vec3f{r * cos(uv.y), r * sin(uv.y), uv.x * height};
-      return transform_point(frame, p);
-    } else {
-      auto r = uv.x > 1 ? r1 : r0;
-      auto p = vec3f{cos(uv.y), sin(uv.y), uv.x};  // point on cylinder
-
-      // project onto spherical caps
-      if (uv.x > 1) p.z -= 1;
-      p.z /= (r / height);
-      p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
-      p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
-      p *= r;
-      if (uv.x > 1) p.z += height;
-      return transform_point(frame, p);
-    }*/
-
   } else if (!shape.points.empty()) {
 
     // ORIGINAL CODE
-    // return transform_point(instance.frame, shape.positions[shape.points[element]]);
-
+    return transform_point(
+        instance.frame, shape.positions[shape.points[element]]);
+        
     // MY CODE
     if (points_as_spheres) {
-      auto p = shape.points[element];
-
       // NOTE: From
       // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/parametric-and-implicit-surfaces.html
-      // From: https://stackoverflow.com/questions/7840429/calculate-the-xyz-point-of-a-sphere-given-a-uv-coordinate-of-its-texture
-      auto& center = shape.positions[p];
-      auto& radius = shape.radius[p];
-
-      auto theta = 2 * pif * uv.x;
-      auto phi   = pif * uv.y;
-
-      auto x = cos(theta) * sin(phi) * radius;
-      auto y = sin(theta) * sin(phi) * radius;
-      auto z = cos(phi) * radius;
-      auto d = vec3f{x, y, z};
-
-      auto position = d + center;
-      return transform_point(instance.frame, position);
-
+      // P.x = \cos(\theta)\sin(\phi),
+      // P.y = \cos(\theta),
+      // P.z = \sin(\theta)\sin(\phi)
+      return transform_point(instance.frame, 
+          vec3f{cos(uv.x) * sin(uv.y), cos(uv.x), sin(uv.x) * sin(uv.y)});
     } else {
       return transform_point(
           instance.frame, shape.positions[shape.points[element]]);
@@ -401,19 +359,17 @@ vec3f eval_element_normal(const scene_data& scene,
     const instance_data& instance, int element, const bool points_as_spheres,
     const bool lines_as_cones, const bool quads_as_patches) {
   auto& shape = scene.shapes[instance.shape];
-
   if (!shape.triangles.empty()) {
     auto t = shape.triangles[element];
     return transform_normal(
         instance.frame, triangle_normal(shape.positions[t.x],
                             shape.positions[t.y], shape.positions[t.z]));
-  
   } else if (!shape.quads.empty()) {
     auto q = shape.quads[element];
     // ORIGINAL CODE
-    /*return transform_normal(
+    return transform_normal(
         instance.frame, quad_normal(shape.positions[q.x], shape.positions[q.y],
-                            shape.positions[q.z], shape.positions[q.w]));*/
+                            shape.positions[q.z], shape.positions[q.w]));
 
     // MY CODE: Check which intersection method to use
     if (quads_as_patches){
@@ -430,7 +386,6 @@ vec3f eval_element_normal(const scene_data& scene,
     auto l = shape.lines[element];
     return transform_normal(instance.frame,
         line_tangent(shape.positions[l.x], shape.positions[l.y]));
-
   } else if (!shape.points.empty()) {
     return {0, 0, 1};
   } else {
@@ -444,11 +399,6 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
     const bool lines_as_cones, const bool quads_as_patches) {
   auto& shape = scene.shapes[instance.shape];
 
-  // ORIGINAL CODE
-  /*if (shape.normals.empty())
-    return eval_element_normal(scene, instance, element, points_as_spheres,
-        lines_as_cones, quads_as_patches);*/
-
   // MY CODE: compute geometric normal in case there aren't precomputed normals 
   if (shape.normals.empty()){
     if (!quads_as_patches)
@@ -458,6 +408,9 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       return eval_element_normal(scene, instance, element, points_as_spheres,
           lines_as_cones, quads_as_patches);
   }
+  
+  // if (shape.normals.empty() && shape.quads.empty())
+  //  return eval_element_normal(scene, instance, element, quads_as_patches);
 
   if (!shape.triangles.empty()) {
     auto t = shape.triangles[element];
@@ -467,9 +420,9 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
   } else if (!shape.quads.empty()) {
     auto q = shape.quads[element];
     // ORIGINAL code
-    /*return transform_normal(instance.frame,
+    return transform_normal(instance.frame,
         normalize(interpolate_quad(shape.normals[q.x], shape.normals[q.y],
-            shape.normals[q.z], shape.normals[q.w], uv)));*/
+            shape.normals[q.z], shape.normals[q.w], uv)));
 
     // MY CODE: Check which intersection method to use
     if (quads_as_patches) {
@@ -499,72 +452,28 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
 
   } else if (!shape.lines.empty()) {
     auto l = shape.lines[element];
-
-    // ORIGINAL CODE
     return transform_normal(instance.frame,
         normalize(
             interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));
-    
-    // MY CODE
-    /*auto& p0     = shape.positions[shape.lines[element].x];
-    auto& p1     = shape.positions[shape.lines[element].y];
-    auto& r0     = shape.radius[shape.lines[element].x];
-    auto& r1     = shape.radius[shape.lines[element].y];
-    auto  height = length(p1 - p0);
-    auto  p0p1   = normalize(p1 - p0);
-    auto  frame  = instance.frame * frame_fromz(p0, p0p1);
-
-    auto h = uv.x;
-    if (h < 0 || h > 1) {
-      auto p      = vec3f{cos(uv.y), sin(uv.y), h};  // point on cylinder
-      auto radius = uv.x > 1 ? r1 : r0;
-
-      // project onto spherical caps
-      if (h > 1) p.z -= 1;
-      p.z /= (radius / height);
-      p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
-      p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
-      return normalize(transform_direction(frame, p));
-    } else {
-      auto n = vec3f{};
-      if (r0 == r1) {
-        n = vec3f{cos(uv.y), sin(uv.y), 0};
-      } else {
-        // auto cone_slope = (r0 - r1) / height;
-        // n        = vec3f{sqrt(1 - cone_slope * cone_slope), 0, cone_slope};
-        // auto rot = rotation_frame({0, 0, 1}, uv.y);
-        // n        = transform_direction(rot, n);
-        auto p = eval_shading_position(scene, instance, element, uv, outgoing);
-        n      = 2 * p;
-        n.z += -2 * p.z - r0 / height - r1 / height;
-      }
-      return normalize(transform_direction(frame, n));
-    }*/
   } else if (!shape.points.empty()) {
     // ORIGINAL CODE
-    // return transform_normal(instance.frame, normalize(shape.normals[shape.points[element]]));
+    return transform_normal(
+        instance.frame, normalize(shape.normals[shape.points[element]]));
 
     // MY CODE
     if (points_as_spheres){
-      auto p = shape.points[element];
-
-      // From:
-      // https://stackoverflow.com/questions/7840429/calculate-the-xyz-point-of-a-sphere-given-a-uv-coordinate-of-its-texture
-      auto& center = shape.positions[p];
-      auto& radius = shape.radius[p];
-
-      auto theta = 2 * pif * uv.x;
-      auto phi   = pif * uv.y;
-
-      auto x = cos(theta) * sin(phi);
-      auto y = sin(theta) * sin(phi);
-      auto z = cos(phi);
-
-      auto d = vec3f{x, y, z};
-      auto normal = normalize(d);
-
-      return transform_normal(instance.frame, normalize(normal));
-
+      return transform_normal(
+          instance.frame, sphere_normal(shape.positions[shape.points[element]],
+              shape.radius[shape.points[element]], uv));
+      /* 
+      auto sphere_center = shape.positions[shape.points[element]];
+      auto sphere_radius = shape.radius[shape.points[element]];
+      auto intersection_point = transform_point(instance.frame, sphere_center);
+      auto normalizedIntersection = (intersection_point - sphere_center) / sphere_radius;
+      auto tangent  = normalize(cross(normalizedIntersection, vec3f{0.0f, 1.0f, 0.0f}));  // Vettore up arbitrario
+      auto binormal = normalize(cross(normalizedIntersection, tangent));
+      return normalize(tangent * uv.x + binormal * uv.y);
+      */
     } else {
       return transform_normal(
           instance.frame, normalize(shape.normals[shape.points[element]]));
@@ -691,12 +600,7 @@ vec3f eval_shading_position(const scene_data& scene,
     return eval_position(scene, instance, element, uv, points_as_spheres,
         lines_as_cones, quads_as_patches);
   } else if (!shape.points.empty()) {
-    // ORIGINAL CODE
-    // return eval_position(scene, element, uv);
-
-    // MY CODE
-    return eval_position(scene, instance, element, uv, points_as_spheres,
-        lines_as_cones, quads_as_patches);
+    return eval_position(shape, element, uv);
   } else {
     return {0, 0, 0};
   }
@@ -723,12 +627,7 @@ vec3f eval_shading_normal(const scene_data& scene,
         lines_as_cones, quads_as_patches);
     return orthonormalize(outgoing, normal);
   } else if (!shape.points.empty()) {
-    // ORIGINAL CODE
-    // return outgoing;
-
-    // MY CODE
-    return eval_normal(scene, instance, element, uv, points_as_spheres,
-        lines_as_cones, quads_as_patches);
+    return outgoing;
   } else {
     return {0, 0, 0};
   }

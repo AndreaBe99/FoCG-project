@@ -293,29 +293,34 @@ namespace yocto {
 // Evaluate instance properties
 // MY CODE: Add FLAGs to switch intersection methods
 vec3f eval_position(const scene_data& scene, const instance_data& instance,
-    int element, const vec2f& uv, const bool quads_as_patches);
+    int element, const vec2f& uv, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches);
 // MY CODE: Add FLAGs to switch intersection methods
-vec3f eval_element_normal(
-    const scene_data& scene, const instance_data& instance, int element, 
-    const bool quads_as_patches);
+vec3f eval_element_normal(const scene_data& scene,
+    const instance_data& instance, int element, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches);
 // MY CODE: Add FLAGs to switch intersection methods
 vec3f eval_normal(const scene_data& scene, const instance_data& instance,
-    int element, const vec2f& uv, const bool quads_as_patches);
+    int element, const vec2f& uv, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches);
 vec2f eval_texcoord(const scene_data& scene, const instance_data& instance,
     int element, const vec2f& uv);
 pair<vec3f, vec3f> eval_element_tangents(
     const scene_data& scene, const instance_data& instance, int element);
 // MY CODE: Add FLAGs to switch intersection methods
 vec3f eval_normalmap(const scene_data& scene, const instance_data& instance,
-    int element, const vec2f& uv, const bool quads_as_patches);
+    int element, const vec2f& uv, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches);
 // MY CODE: Add FLAGs to switch intersection methods
 vec3f eval_shading_position(const scene_data& scene,
     const instance_data& instance, int element, const vec2f& uv,
-    const vec3f& outgoing, const bool quads_as_patches);
+    const vec3f& outgoing, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches);
 // MY CODE: Add FLAGs to switch intersection methods
 vec3f eval_shading_normal(const scene_data& scene,
     const instance_data& instance, int element, const vec2f& uv,
-    const vec3f& outgoing, const bool quads_as_patches);
+    const vec3f& outgoing, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches);
 vec4f eval_color(const scene_data& scene, const instance_data& instance,
     int element, const vec2f& uv);
 

@@ -510,10 +510,15 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
         auto& p             = shape.points[bvh.primitives[idx]];
 
         // MY CODE: Check which intersection method to use
+        prim_intersection pintersection;
+        if (points_as_spheres) {
+          pintersection = intersect_sphere(ray, shape.positions[p], 
+              shape.radius[p]);
+        } else {
+          pintersection = intersect_point(ray, shape.positions[p], 
+              shape.radius[p]);
+        }
 
-        auto pintersection = points_as_spheres
-            ? intersect_sphere(ray, shape.positions[p], shape.radius[p])
-            : intersect_point(ray, shape.positions[p], shape.radius[p]);
         if (!pintersection.hit) continue;
 
         // MY CODE: Add position and normal
@@ -527,12 +532,15 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
         auto& l             = shape.lines[bvh.primitives[idx]];
 
         // MY CODE: Check which intersection method to use
-        auto pintersection = lines_as_cones
-            ? intersect_cone(ray, shape.positions[l.x], shape.positions[l.y],
-                shape.radius[l.x], shape.radius[l.y]) 
-            : intersect_line(ray, shape.positions[l.x], shape.positions[l.y], 
-                shape.radius[l.x], shape.radius[l.y]);
-        
+        prim_intersection pintersection;
+        if (lines_as_cones) {
+          pintersection = intersect_cone(ray, shape.positions[l.x],
+              shape.positions[l.y], shape.radius[l.x], shape.radius[l.y]);
+        } else {
+          pintersection = intersect_line(ray, shape.positions[l.x],
+              shape.positions[l.y], shape.radius[l.x], shape.radius[l.y]);
+        }
+
         if (!pintersection.hit) continue;
 
         // MY CODE: Add position and normal
@@ -557,12 +565,15 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
         auto& q             = shape.quads[bvh.primitives[idx]];
 
         // MY CODE: Check which intersection method to use
-        auto pintersection = quads_as_patches 
-            ? intersect_patch(ray, shape.positions[q.x], shape.positions[q.y], 
-                shape.positions[q.z], shape.positions[q.w], shape.positions,
-                shape.normals, shape.quads, q) 
-            : intersect_quad(ray, shape.positions[q.x], shape.positions[q.y], 
-                shape.positions[q.z], shape.positions[q.w]);
+        prim_intersection pintersection;
+        if (quads_as_patches) {
+          pintersection = intersect_patch(ray, shape.positions[q.x], 
+              shape.positions[q.y], shape.positions[q.z], shape.positions[q.w], 
+              shape.positions, shape.normals, shape.quads, q);
+        } else {
+          pintersection = intersect_quad(ray, shape.positions[q.x],
+              shape.positions[q.y], shape.positions[q.z], shape.positions[q.w]);
+        }
 
         if (!pintersection.hit) continue;
 

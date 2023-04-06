@@ -102,7 +102,7 @@ struct scene_intersection {
 
   // MY CODE: Add position and normal, to return them in the intersection call.
   vec3f position = {0, 0, 0};
-  vec3f normal   = {0, 0, 1};
+  vec3f normal   = {0, 0, 0};
 };
 
 // Intersect ray with a bvh returning either the first or any intersection
