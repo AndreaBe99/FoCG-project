@@ -334,31 +334,45 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
         interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
 
     // MY CODE
-    /*auto& p0     = shape.positions[shape.lines[element].x];
-    auto& p1     = shape.positions[shape.lines[element].y];
-    auto& r0     = shape.radius[shape.lines[element].x];
-    auto& r1     = shape.radius[shape.lines[element].y];
-    auto  height = length(p1 - p0);
-    auto  p0p1   = normalize(p1 - p0);
-    auto  frame  = instance.frame * frame_fromz(p0, p0p1);
+    if (lines_as_cones){
+      auto& p0     = shape.positions[l.x];
+      auto& p1     = shape.positions[l.y];
+      auto& r0     = shape.radius[l.x];
+      auto& r1     = shape.radius[l.y];
 
-    if (uv.x >= 0 && uv.x <= 1) {
-      auto r = lerp(r0, r1, uv.x);
-      auto p = vec3f{r * cos(uv.y), r * sin(uv.y), uv.x * height};
-      return transform_point(frame, p);
+      // TEST
+      /*
+      auto ba     = normalize(p1 - p0);
+      auto ba_len = length(p1 - p0);
+      auto p = p0 + ba * uv.x * ba_len;
+      return transform_point(instance.frame, p);
+      */
+      auto  height = length(p1 - p0);
+      auto  p0p1   = normalize(p1 - p0);
+      auto  frame  = instance.frame * frame_fromz(p0, p0p1);
+
+      if (uv.x >= 0 && uv.x <= 1) {
+        auto r = lerp(r0, r1, uv.x);
+        auto p = vec3f{r * cos(uv.y), r * sin(uv.y), uv.x * height};
+        return transform_point(frame, p);
+      } else {
+        auto r = uv.x > 1 ? r1 : r0;
+        auto p = vec3f{cos(uv.y), sin(uv.y), uv.x};  // point on cylinder
+
+        // project onto spherical caps
+        if (uv.x > 1) p.z -= 1;
+        p.z /= (r / height);
+        p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
+        p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
+        p *= r;
+        if (uv.x > 1) p.z += height;
+        return transform_point(frame, p);
+      }
+      
     } else {
-      auto r = uv.x > 1 ? r1 : r0;
-      auto p = vec3f{cos(uv.y), sin(uv.y), uv.x};  // point on cylinder
-
-      // project onto spherical caps
-      if (uv.x > 1) p.z -= 1;
-      p.z /= (r / height);
-      p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
-      p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
-      p *= r;
-      if (uv.x > 1) p.z += height;
-      return transform_point(frame, p);
-    }*/
+      return transform_point(instance.frame,
+        interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
+    }
 
   } else if (!shape.points.empty()) {
 
@@ -499,47 +513,82 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
 
   } else if (!shape.lines.empty()) {
     auto l = shape.lines[element];
-
     // ORIGINAL CODE
-    return transform_normal(instance.frame,
+    /*return transform_normal(instance.frame,
         normalize(
-            interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));
+            interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));*/
     
     // MY CODE
-    /*auto& p0     = shape.positions[shape.lines[element].x];
-    auto& p1     = shape.positions[shape.lines[element].y];
-    auto& r0     = shape.radius[shape.lines[element].x];
-    auto& r1     = shape.radius[shape.lines[element].y];
-    auto  height = length(p1 - p0);
-    auto  p0p1   = normalize(p1 - p0);
-    auto  frame  = instance.frame * frame_fromz(p0, p0p1);
+    if (lines_as_cones){
+      auto& p0     = shape.positions[l.x];
+      auto& p1     = shape.positions[l.y];
+      auto& r0     = shape.radius[l.x];
+      auto& r1     = shape.radius[l.y];
 
-    auto h = uv.x;
-    if (h < 0 || h > 1) {
-      auto p      = vec3f{cos(uv.y), sin(uv.y), h};  // point on cylinder
-      auto radius = uv.x > 1 ? r1 : r0;
+      // TEST
+      /*
+      // compute axis and axis length 
+      auto ba     = normalize(p1 - p0);
+      auto ba_len = length(p1 - p0);
+      // compute point on axis
+      auto p = p0 + ba * uv.x * ba_len;
+      // compute radius and cap height
+      // auto r = mix(r0, r1, uv.y);
+      auto r = r0 * (1.0f - uv.y) + r1 * uv.y;
+      auto h = ba_len;
+      // compute normal to axis at point p
+      auto line_direction = normalize(p1 - p0);
+      auto t = dot(p - p0, line_direction);
+      auto closest_point_on_line = p0 + t * line_direction;
+      auto axis_normal = normalize(p - closest_point_on_line);
+      // compute normal to cap at point p
+      auto cap_normal = (p.y > p0.y + h && p.y < p1.y - h)
+                            ? normalize(vec3f{p.x - p0.x, 0, p.z - p0.z})
+                            : (p.y <= p0.y + h ? -ba : ba);
+      // interpolate between axis normal and cap normal based on radius
+      auto normal = normalize(lerp(cap_normal, axis_normal, smoothstep(r, 0.0f, h)));
+      return transform_normal(instance.frame, normal);
+      
+      */
+      auto  height = length(p1 - p0);
+      auto  p0p1   = normalize(p1 - p0);
+      auto  frame  = instance.frame * frame_fromz(p0, p0p1);
 
-      // project onto spherical caps
-      if (h > 1) p.z -= 1;
-      p.z /= (radius / height);
-      p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
-      p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
-      return normalize(transform_direction(frame, p));
-    } else {
-      auto n = vec3f{};
-      if (r0 == r1) {
-        n = vec3f{cos(uv.y), sin(uv.y), 0};
+      auto h = uv.x;
+      if (h < 0 || h > 1) {
+        auto p      = vec3f{cos(uv.y), sin(uv.y), h};  // point on cylinder
+        auto radius = uv.x > 1 ? r1 : r0;
+
+        // project onto spherical caps
+        if (h > 1) p.z -= 1;
+        p.z /= (radius / height);
+        p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
+        p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
+        return normalize(transform_direction(frame, p));
       } else {
-        // auto cone_slope = (r0 - r1) / height;
-        // n        = vec3f{sqrt(1 - cone_slope * cone_slope), 0, cone_slope};
-        // auto rot = rotation_frame({0, 0, 1}, uv.y);
-        // n        = transform_direction(rot, n);
-        auto p = eval_shading_position(scene, instance, element, uv, outgoing);
-        n      = 2 * p;
-        n.z += -2 * p.z - r0 / height - r1 / height;
+        auto n = vec3f{};
+        if (r0 == r1) {
+          n = vec3f{cos(uv.y), sin(uv.y), 0};
+        } else {
+          // auto cone_slope = (r0 - r1) / height;
+          // n        = vec3f{sqrt(1 - cone_slope * cone_slope), 0, cone_slope};
+          // auto rot = rotation_frame({0, 0, 1}, uv.y);
+          // n        = transform_direction(rot, n);
+          auto p = eval_shading_position(scene, instance, element, uv, {0,0,0}, 
+              points_as_spheres, lines_as_cones, quads_as_patches);
+
+                  n = 2 * p;
+          n.z += -2 * p.z - r0 / height - r1 / height;
+        }
+        return normalize(transform_direction(frame, n));
       }
-      return normalize(transform_direction(frame, n));
-    }*/
+      
+    } else {
+      return transform_normal(instance.frame,
+          normalize(
+              interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));
+    }
+    
   } else if (!shape.points.empty()) {
     // ORIGINAL CODE
     // return transform_normal(instance.frame, normalize(shape.normals[shape.points[element]]));
@@ -728,7 +777,7 @@ vec3f eval_shading_normal(const scene_data& scene,
 
     // MY CODE
     return eval_normal(scene, instance, element, uv, points_as_spheres,
-        lines_as_cones, quads_as_patches);
+        lines_as_cones, quads_as_patches);  
   } else {
     return {0, 0, 0};
   }

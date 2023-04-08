@@ -879,10 +879,17 @@ inline prim_intersection intersect_cone(
   // NOTE: cone defined by extremes pa and pb, and radious ra and rb.
   // ray.o is the ray origin
   // ray.d is the ray direction
+
+  // Direction of the cone axis
   vec3f ba = p1 - p0;
+  // Direction of the ray relative to the cone extremes
   vec3f oa = ray.o - p0;
   vec3f ob = ray.o - p1;
+
+  // Difference between the cone radious
   float rr = r0 - r1;
+
+  // Intermediate values for the quadratic equation
   float m0 = dot(ba, ba);
   float m1 = dot(ba, oa);
   float m2 = dot(ba, ray.d);
@@ -893,16 +900,20 @@ inline prim_intersection intersect_cone(
 
   // body
   float d2 = m0 - rr * rr;
-
   float k2 = d2 - m2 * m2;
   float k1 = d2 * m3 - m1 * m2 + m2 * rr * r0;
   float k0 = d2 * m5 - m1 * m1 + m1 * rr * r0 * 2.0 - m0 * r0 * r0;
 
+  // Discriminat of the quadratic equation
   float h = k1 * k1 - k0 * k2;
 
+  // No intersection
   if (h < 0.0) return {};
 
+  // Compute the distance t from the ray origin to the intersection
   float t = (-sqrt(h) - k1) / k2;
+
+  // The intersection is behind the ray origin
   if (t < 0.0) return {};
 
   float y = m1 - r0 * rr + t * m2;
@@ -912,20 +923,27 @@ inline prim_intersection intersect_cone(
     // compute position and normal
     vec3f position = ray_point(ray, t);
     vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
+
     // compute u and v
-    vec2f uv = compute_uv(ray, p0, p1, normal);
+    // vec2f uv = compute_uv(ray, p0, p1, normal);
+    auto u = position.z / length(p0 - p1);
+    auto v = atan2(position.y, position.x);
+    vec2f uv = {u, v};
+
     return {uv, t, true, position, normal};
   }
 
-  // caps
+  // Intersection with caps of the cone
   float h1 = m3 * m3 - m5 + r0 * r0;
   float h2 = m6 * m6 - m7 + r1 * r1;
 
+  // No intersection with the caps
   if (max(h1, h2) < 0.0) return {};
 
   auto  r      = 1e20f;
   vec3f normal = {0, 0, 0};
 
+  // Intersection with one of the caps, select the closest one to the ray origin
   if (h1 > 0.0) {
     r = -m3 - sqrt(h1);
     normal = (oa + t * ray.d) / r0;
@@ -942,7 +960,10 @@ inline prim_intersection intersect_cone(
   // compute position and normal
   vec3f position = ray_point(ray, t);
   // compute u and v
-  vec2f uv = compute_uv(ray, p0, p1, normal); 
+  // vec2f uv = compute_uv(ray, p0, p1, normal);
+  auto  u  = position.z / length(p0 - p1);
+  auto  v  = atan2(position.y, position.x);
+  vec2f uv = {u, v};
 
   // intersection occurred: set params and exit
   return {uv, r, true, position, normal};
