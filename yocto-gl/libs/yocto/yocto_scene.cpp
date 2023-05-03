@@ -297,33 +297,31 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
                             shape.positions[t.y], shape.positions[t.z], uv));
   } else if (!shape.quads.empty()) {
     auto q = shape.quads[element];
-    
+
     // ORIGINAL CODE
     /*return transform_point(instance.frame,
         interpolate_quad(shape.positions[q.x], shape.positions[q.y],
             shape.positions[q.z], shape.positions[q.w], uv));*/
-            
+
     // MY CODE: Check which intersection method to use
-    if (quads_as_patches){
+    if (quads_as_patches) {
       auto q00 = shape.positions[q.x];
       auto q10 = shape.positions[q.y];
-      auto q11 = shape.positions[q.z]; 
+      auto q11 = shape.positions[q.z];
       auto q01 = shape.positions[q.w];
-      auto u = uv.x;
-      auto v = uv.y;
+      auto u   = uv.x;
+      auto v   = uv.y;
 
-      // NOTE: From Cool Patches: A Geometric Approach to Ray/Bilinear Patch 
-      // Intersections, Formula [1], page 2. 
-      auto position = q00 * (1 - u) * (1 - v) + 
-                      q10 * u       * (1 - v) + 
-                      q01 * (1 - u) * v       +
-                      q11 * u       * v;
+      // NOTE: From Cool Patches: A Geometric Approach to Ray/Bilinear Patch
+      // Intersections, Formula [1], page 2.
+      auto position = q00 * (1 - u) * (1 - v) + q10 * u * (1 - v) +
+                      q01 * (1 - u) * v + q11 * u * v;
       return transform_point(instance.frame, position);
-    
+
     } else {
       return transform_point(instance.frame,
-        interpolate_quad(shape.positions[q.x], shape.positions[q.y],
-            shape.positions[q.z], shape.positions[q.w], uv));
+          interpolate_quad(shape.positions[q.x], shape.positions[q.y],
+              shape.positions[q.z], shape.positions[q.w], uv));
     }
 
   } else if (!shape.lines.empty()) {
@@ -334,50 +332,113 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
         interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
 
     // MY CODE
-    if (lines_as_cones){
-      auto& p0     = shape.positions[l.x];
-      auto& p1     = shape.positions[l.y];
-      auto& r0     = shape.radius[l.x];
-      auto& r1     = shape.radius[l.y];
+    if (lines_as_cones) {
+      auto& p0 = shape.positions[l.x];
+      auto& p1 = shape.positions[l.y];
+      auto& r0 = shape.radius[l.x];
+      auto& r1 = shape.radius[l.y];
 
-      // TEST
+      // Compute the real apex of the cone
+      auto base_radius      = r0 > r1 ? r0 : r1;
+      auto temp_apex_radius = r0 > r1 ? r1 : r0;
+      auto base             = r0 > r1 ? p0 : p1;
+      auto temp_apex        = r0 > r1 ? p1 : p0;
+      auto apex             = length(temp_apex - base) *
+                  (base_radius / (temp_apex_radius - base_radius));
+
+      auto x = base_radius * cos(uv.x * 2 * pif);
+      auto y = base_radius * sin(uv.x * 2 * pif);
+      auto z = uv.y * length(apex - base);
+
+      auto position = vec3f{x, y, z};
+
       /*
-      auto ba     = normalize(p1 - p0);
-      auto ba_len = length(p1 - p0);
-      auto p = p0 + ba * uv.x * ba_len;
-      return transform_point(instance.frame, p);
-      */
-      auto  height = length(p1 - p0);
-      auto  p0p1   = normalize(p1 - p0);
-      auto  frame  = instance.frame * frame_fromz(p0, p0p1);
+      // Compute the direction of the cone axis
+      vec3f ba = p1 - p0;
 
-      if (uv.x >= 0 && uv.x <= 1) {
-        auto r = lerp(r0, r1, uv.x);
-        auto p = vec3f{r * cos(uv.y), r * sin(uv.y), uv.x * height};
-        return transform_point(frame, p);
-      } else {
-        auto r = uv.x > 1 ? r1 : r0;
-        auto p = vec3f{cos(uv.y), sin(uv.y), uv.x};  // point on cylinder
+      // Compute the length of the cone axis and the difference between the
+      // radii
+      float l  = length(ba);
+      float rr = r0 - r1;
 
-        // project onto spherical caps
-        if (uv.x > 1) p.z -= 1;
-        p.z /= (r / height);
-        p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
-        p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
-        p *= r;
-        if (uv.x > 1) p.z += height;
-        return transform_point(frame, p);
+      // Compute the angle between the cone axis and the ray
+      float theta = atan2(rr, l);
+
+      // Compute the angle between the ray and the plane perpendicular to the
+      // cone axis
+      float phi = 2 * pif * uv.x;
+
+      // Compute the distance from the apex of the cone to the surface point
+      float h = uv.y * l;
+
+      // Compute the position of the point on the surface of the cone
+      vec3f pc  = p0 + ba * (h / l);
+      vec3f dir = normalize(cross(ba, vec3f{1, 0, 0}));
+      if (length(dir) < 0.001f) {
+        dir = normalize(cross(ba, vec3f{0, 1, 0}));
       }
-      
+      vec3f pa = pc + dir * r0 * cos(theta);
+      vec3f pb = p1 + dir * r1 * cos(theta);
+      vec3f position  = pa * cos(phi) + pb * sin(phi) +
+                dir * (uv.y * rr + r0 * sin(theta));
+
+      // Compute the normal of the point on the surface of the cone
+      //vec3f n = normalize((p - pc) / vec3f{r0, r0, l - h});
+      */
+      return transform_point(instance.frame, position);
+
+      // Intesect cone
+      /*
+      if (uv.y >= 0 && uv.y <= 1) {
+        // TEST Follow: Ray Tracing Generalized Tube Primitives: Method and
+        // Applications Compute the cone orientation
+        auto c = (p1 - p0) / length(p1 - p0);
+        // Let A the vertex of the cone
+        // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
+        // r1 / r0 = p_one / p_zero
+        // So the apex is
+        auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
+        auto p_zero = length(p0 - apex);
+        auto p_one  = length(p1 - apex);
+        // Compute the locations of the clipping planes z1 and z2.
+        auto z0 = p_zero - ((r0 * r0) / p_zero);
+        auto z1 = p_one - ((r1 * r1) / p_one);
+        // Compute the width of the cone at the base
+        auto x1      = sqrt(p_one * p_one - r1 * r1);
+        auto r_width = (p_one * r1) / x1;
+        auto w_point = apex - z1;
+
+        auto x = r_width * cos(uv.x);
+        auto y = r_width * sin(uv.x);
+        auto z = uv.y * z1;
+
+        auto point = vec3f{x, y, z};
+
+        return transform_point(instance.frame, point);
+      }
+      // Intersect sphere
+      else {
+        auto phi   = 2 * pif * uv.x;
+        auto theta = pif * uv.y;
+
+        auto r = uv.y > 1 ? r1 : r0;
+        auto x = cos(phi) * sin(theta) * r;
+        auto y = sin(phi) * sin(theta) * r;
+        auto z = cos(theta) * r;
+
+        auto point = vec3f{x, y, z};
+        return transform_point(instance.frame, point);
+      }
+      */
     } else {
       return transform_point(instance.frame,
-        interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
+          interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
     }
 
   } else if (!shape.points.empty()) {
-
     // ORIGINAL CODE
-    // return transform_point(instance.frame, shape.positions[shape.points[element]]);
+    // return transform_point(instance.frame,
+    // shape.positions[shape.points[element]]);
 
     // MY CODE
     if (points_as_spheres) {
@@ -385,16 +446,17 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
 
       // NOTE: From
       // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/parametric-and-implicit-surfaces.html
-      // From: https://stackoverflow.com/questions/7840429/calculate-the-xyz-point-of-a-sphere-given-a-uv-coordinate-of-its-texture
+      // From:
+      // https://stackoverflow.com/questions/7840429/calculate-the-xyz-point-of-a-sphere-given-a-uv-coordinate-of-its-texture
       auto& center = shape.positions[p];
       auto& radius = shape.radius[p];
 
-      auto theta = 2 * pif * uv.x;
-      auto phi   = pif * uv.y;
+      auto phi   = 2 * pif * uv.x;
+      auto theta = pif * uv.y;
 
-      auto x = cos(theta) * sin(phi) * radius;
-      auto y = sin(theta) * sin(phi) * radius;
-      auto z = cos(phi) * radius;
+      auto x = cos(phi) * sin(theta) * radius;
+      auto y = sin(phi) * sin(theta) * radius;
+      auto z = cos(theta) * radius;
       auto d = vec3f{x, y, z};
 
       auto position = d + center;
@@ -421,25 +483,25 @@ vec3f eval_element_normal(const scene_data& scene,
     return transform_normal(
         instance.frame, triangle_normal(shape.positions[t.x],
                             shape.positions[t.y], shape.positions[t.z]));
-  
+
   } else if (!shape.quads.empty()) {
     auto q = shape.quads[element];
     // ORIGINAL CODE
     /*return transform_normal(
-        instance.frame, quad_normal(shape.positions[q.x], shape.positions[q.y],
-                            shape.positions[q.z], shape.positions[q.w]));*/
+        instance.frame, quad_normal(shape.positions[q.x],
+       shape.positions[q.y], shape.positions[q.z], shape.positions[q.w]));*/
 
     // MY CODE: Check which intersection method to use
-    if (quads_as_patches){
+    if (quads_as_patches) {
       auto normal = normalize(cross(shape.positions[q.y] - shape.positions[q.x],
           shape.positions[q.z] - shape.positions[q.y]));
       return transform_normal(instance.frame, normal);
     } else {
-      return transform_normal(
-        instance.frame, quad_normal(shape.positions[q.x], shape.positions[q.y],
-                            shape.positions[q.z], shape.positions[q.w]));
+      return transform_normal(instance.frame,
+          quad_normal(shape.positions[q.x], shape.positions[q.y],
+              shape.positions[q.z], shape.positions[q.w]));
     }
-    
+
   } else if (!shape.lines.empty()) {
     auto l = shape.lines[element];
     return transform_normal(instance.frame,
@@ -463,8 +525,9 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
     return eval_element_normal(scene, instance, element, points_as_spheres,
         lines_as_cones, quads_as_patches);*/
 
-  // MY CODE: compute geometric normal in case there aren't precomputed normals 
-  if (shape.normals.empty()){
+  // MY CODE: compute geometric normal in case there aren't precomputed
+  // normals
+  if (shape.normals.empty()) {
     if (!quads_as_patches)
       return eval_element_normal(scene, instance, element, points_as_spheres,
           lines_as_cones, quads_as_patches);
@@ -492,14 +555,14 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
         // geometric normal
         auto q00 = shape.positions[q.x];
         auto q10 = shape.positions[q.y];
-        auto q11 = shape.positions[q.z]; 
+        auto q11 = shape.positions[q.z];
         auto q01 = shape.positions[q.w];
-        auto e10 = q10 - q00;  
-        auto e11 = q11 - q10;  
-        auto e00 = q01 - q00;  
-        auto du = lerp(e10, q11 - q01, uv.y);
-        auto dv = lerp(e00, e11, uv.x);
-        normal  = cross(du, dv);
+        auto e10 = q10 - q00;
+        auto e11 = q11 - q10;
+        auto e00 = q01 - q00;
+        auto du  = lerp(e10, q11 - q01, uv.y);
+        auto dv  = lerp(e00, e11, uv.x);
+        normal   = cross(du, dv);
       } else {
         normal = lerp(lerp(shape.normals[q.x], shape.normals[q.y], uv.x),
             lerp(shape.normals[q.w], shape.normals[q.z], uv.x), uv.y);
@@ -516,85 +579,243 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
     // ORIGINAL CODE
     /*return transform_normal(instance.frame,
         normalize(
-            interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));*/
-    
+            interpolate_line(shape.normals[l.x], shape.normals[l.y],
+       uv.x)));*/
+
     // MY CODE
-    if (lines_as_cones){
-      auto& p0     = shape.positions[l.x];
-      auto& p1     = shape.positions[l.y];
-      auto& r0     = shape.radius[l.x];
-      auto& r1     = shape.radius[l.y];
+    if (lines_as_cones) {
+      auto& p0 = shape.positions[l.x];
+      auto& p1 = shape.positions[l.y];
+      auto& r0 = shape.radius[l.x];
+      auto& r1 = shape.radius[l.y];
 
-      // TEST
+      // Compute the real apex of the cone
+      auto base_radius      = r0 > r1 ? r0 : r1;
+      auto temp_apex_radius = r0 > r1 ? r1 : r0;
+      auto base             = r0 > r1 ? p0 : p1;
+      auto temp_apex        = r0 > r1 ? p1 : p0;
+      auto apex             = length(temp_apex - base) *
+                  (base_radius / (temp_apex_radius - base_radius));
+
+      auto x = base_radius * cos(uv.x * 2 * pif);
+      auto y = base_radius * sin(uv.x * 2 * pif);
+      auto z = uv.y * length(apex - base);
+
+      auto position = vec3f{x, y, z};
       /*
-      // compute axis and axis length 
-      auto ba     = normalize(p1 - p0);
-      auto ba_len = length(p1 - p0);
-      // compute point on axis
-      auto p = p0 + ba * uv.x * ba_len;
-      // compute radius and cap height
-      // auto r = mix(r0, r1, uv.y);
-      auto r = r0 * (1.0f - uv.y) + r1 * uv.y;
-      auto h = ba_len;
-      // compute normal to axis at point p
-      auto line_direction = normalize(p1 - p0);
-      auto t = dot(p - p0, line_direction);
-      auto closest_point_on_line = p0 + t * line_direction;
-      auto axis_normal = normalize(p - closest_point_on_line);
-      // compute normal to cap at point p
-      auto cap_normal = (p.y > p0.y + h && p.y < p1.y - h)
-                            ? normalize(vec3f{p.x - p0.x, 0, p.z - p0.z})
-                            : (p.y <= p0.y + h ? -ba : ba);
-      // interpolate between axis normal and cap normal based on radius
-      auto normal = normalize(lerp(cap_normal, axis_normal, smoothstep(r, 0.0f, h)));
-      return transform_normal(instance.frame, normal);
-      
-      */
-      auto  height = length(p1 - p0);
-      auto  p0p1   = normalize(p1 - p0);
-      auto  frame  = instance.frame * frame_fromz(p0, p0p1);
-
-      auto h = uv.x;
-      if (h < 0 || h > 1) {
-        auto p      = vec3f{cos(uv.y), sin(uv.y), h};  // point on cylinder
-        auto radius = uv.x > 1 ? r1 : r0;
-
-        // project onto spherical caps
-        if (h > 1) p.z -= 1;
-        p.z /= (radius / height);
-        p.x *= sqrt(max(1 - p.z * p.z, 0.0f));
-        p.y *= sqrt(max(1 - p.z * p.z, 0.0f));
-        return normalize(transform_direction(frame, p));
-      } else {
-        auto n = vec3f{};
-        if (r0 == r1) {
-          n = vec3f{cos(uv.y), sin(uv.y), 0};
-        } else {
-          // auto cone_slope = (r0 - r1) / height;
-          // n        = vec3f{sqrt(1 - cone_slope * cone_slope), 0, cone_slope};
-          // auto rot = rotation_frame({0, 0, 1}, uv.y);
-          // n        = transform_direction(rot, n);
-          auto p = eval_shading_position(scene, instance, element, uv, {0,0,0}, 
-              points_as_spheres, lines_as_cones, quads_as_patches);
-
-                  n = 2 * p;
-          n.z += -2 * p.z - r0 / height - r1 / height;
-        }
-        return normalize(transform_direction(frame, n));
+      // Compute the direction of the cone axis
+      vec3f ba = p1 - p0;
+      // Compute the length of the cone axis and the difference between the
+      // radii
+      float l  = length(ba);
+      float rr = r0 - r1;
+      // Compute the angle between the cone axis and the ray
+      float theta = atan2(rr, l);
+      // Compute the angle between the ray and the plane perpendicular to the
+      // cone axis
+      float phi = 2 * pif * uv.x;
+      // Compute the distance from the apex of the cone to the surface point
+      float h = uv.y * l;
+      // Compute the position of the point on the surface of the cone
+      vec3f pc  = p0 + ba * (h / l);
+      vec3f dir = normalize(cross(ba, vec3f{1, 0, 0}));
+      if (length(dir) < 0.001f) {
+        dir = normalize(cross(ba, vec3f{0, 1, 0}));
       }
-      
+      vec3f pa = pc + dir * r0 * cos(theta);
+      vec3f pb = p1 + dir * r1 * cos(theta);
+      vec3f position  = pa * cos(phi) + pb * sin(phi) +
+                dir * (uv.y * rr + r0 * sin(theta));
+      // vec3f normal = normalize((p - pc) / vec3f{r0, r0, l - h});
+      */
+
+      /*
+        To determine if a point P is on one of the two spheres or on the lateral
+        part of the cone, you can use the following steps:
+
+        1. Calculate the distance between point P and the center of each sphere,
+            i.e., P0 and P1.
+
+        2. If the distance between P and P0 is approximately equal to R0, then P
+            is on the sphere with radius R0. Similarly, if the distance between
+            P and P1 is approximately equal to R1, then P is on the sphere with
+            radius R1.
+
+        3. If P is not on either of the spheres, calculate the distance between
+            P and the line segment connecting P0 and P1, which represents the
+            axis of the cone.
+
+        4. If the distance between P and the axis of the cone is approximately
+            equal to the radius of the cone at the height of P, then P is on the
+            lateral part of the cone.
+      */
+
+      // Compute the distance between point P and the center of each sphere
+      auto d0 = length(position - p0);
+      auto d1 = length(position - p1);
+      // Check if P is on the sphere with radius R0
+      if (abs(d0 - r0) < 1e-6f) {
+        // P is on the sphere with radius R0
+        // p is not between p0 and p1, is on the sphere
+        /* auto phi    = 2 * pif * uv.x;
+        auto theta  = pif * uv.y;
+        auto x      = cos(phi) * sin(theta);
+        auto y      = sin(phi) * sin(theta);
+        auto z      = cos(theta);
+        auto d      = vec3f{x, y, z};
+        auto normal = normalize(d);
+        */
+        return transform_normal(instance.frame, normalize(position - p0));
+      } else if (abs(d1 - r1) < 1e-6f) {
+        // P is on the sphere with radius R1
+        // COMMENTED CODE AS BEFORE
+        return transform_normal(instance.frame, normalize(position - p1));
+      } else {
+        // P is on the lateral part of the cone
+        // auto normal = normalize(p - pc);
+
+        // Compute the axis vector of the cone
+        /*
+        auto cone_dir = normalize(p1 - p0);
+        // Compute the vector from the apex of the cone to the point P
+        auto point_dir = p - p0;
+        // Project point_dir onto the plane perpendicular to cone_dir
+        auto proj = point_dir - dot(point_dir, cone_dir) * cone_dir;
+        // Compute the surface normal by normalizing the projected vector
+        auto normal = normalize(proj);
+        */
+
+        // TEST
+        /*
+        // Follow: Ray Tracing Generalized Tube Primitives: Method and
+        // Applications
+        // Compute the cone orientation
+        auto c = (p1 - p0) / length(p1 - p0);
+        // Let A the vertex of the cone
+        // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
+        // r1 / r0 = p_one / p_zero
+        // So the apex is
+        auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
+        auto p_zero = length(p0 - apex);
+        auto p_one  = length(p1 - apex);
+        // Compute the locations of the clipping planes z1 and z2.
+        auto z0 = p_zero - ((r0 * r0) / p_zero);
+        auto z1 = p_one - ((r1 * r1) / p_one);
+        // Compute the width of the cone at the base
+        auto x1      = sqrt(p_one * p_one - r1 * r1);
+        auto r_width = (p_one * r1) / x1;
+        auto w_point = apex - z1;
+
+        // Compute the opening angle of the cone, from
+        // https://rechneronline.de/pi/cone.php
+        auto angle = 2 * asin(r0 / p_zero);
+        // Compute the gradient of the cone equation at P
+        auto df_dx = 2 * (p.x - p0.x);
+        auto df_dy = 2 * (p.y - p0.y);
+        auto df_dz = 2 * (p.z - p0.z) * pow(tan(angle), 2);
+        // Compute the cross product of the gradient vectors
+        auto n = vec3f{df_dy * df_dz, df_dz * df_dx, df_dx * df_dy};
+        */
+
+        // Compute cone $\dpdu$ and $\dpdv$
+        auto phiMax = 2 * pif;
+        auto height = length(apex - base);
+        auto dpdu   = vec3f{-phiMax * position.y, phiMax * position.x, 0};
+        auto dpdv   = vec3f{
+            -position.x / (1.f - uv.y), -position.y / (1.f - uv.y), height};
+
+        // Compute cone $\dndu$ and $\dndv$
+        auto d2Pduu = -phiMax * phiMax* vec3f{position.x, position.y, 0.};
+        auto                            d2Pduv = phiMax / (1.f - uv.y) *
+                      vec3f{position.y, -position.x, 0.};
+        auto d2Pdvv = vec3f{0, 0, 0};
+
+        // Compute coefficients for fundamental forms
+        auto E = dot(dpdu, dpdu);
+        auto F = dot(dpdu, dpdv);
+        auto G = dot(dpdv, dpdv);
+        auto N = normalize(cross(dpdu, dpdv));
+
+        // return transform_normal(instance.frame, N);
+
+        auto e = dot(N, d2Pduu);
+        auto f = dot(N, d2Pduv);
+        auto g = dot(N, d2Pdvv);
+
+        // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
+        auto invEGF2 = 1.f / (E * G - F * F);
+        auto dndu    = vec3f{(f * F - e * G) * invEGF2 * dpdu +
+                          (e * F - f * E) * invEGF2 * dpdv};
+        auto dndv    = vec3f{(g * F - f * G) * invEGF2 * dpdu +
+                          (f * F - g * E) * invEGF2 * dpdv};
+
+        auto normal = normalize(cross(dpdu, dpdv));
+
+        return transform_normal(instance.frame, normal);
+      }
+
+      /*
+      // Intesect cone
+      if (uv.y >= 0 && uv.y <= 1) {
+        // TEST Follow: Ray Tracing Generalized Tube Primitives: Method and
+        // Applications Compute the cone orientation
+        auto c = (p1 - p0) / length(p1 - p0);
+        // Let A the vertex of the cone
+        // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
+        // r1 / r0 = p_one / p_zero
+        // So the apex is
+        auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
+        auto p_zero = length(p0 - apex);
+        auto p_one  = length(p1 - apex);
+        // Compute the locations of the clipping planes z1 and z2.
+        auto z0 = p_zero - ((r0 * r0) / p_zero);
+        auto z1 = p_one - ((r1 * r1) / p_one);
+        // Compute the width of the cone at the base
+        auto x1      = sqrt(p_one * p_one - r1 * r1);
+        auto r_width = (p_one * r1) / x1;
+        auto w_point = apex - z1;
+
+        auto x        = r_width * cos(uv.x);
+        auto y        = r_width * sin(uv.x);
+        auto z        = uv.y * z1;
+        auto position = vec3f{x, y, z};
+
+        auto dpdu = 2 * pif * vec3f{-position.z, 0, position.x};
+        auto dpdv = vec3f{
+            -position.x / (1 - uv.y), z1, -position.z / (1 - uv.y)};
+        auto normal = normalize(-cross(dpdu, dpdv));
+
+        return transform_normal(instance.frame, normal);
+      }
+      // Intersect sphere
+      else {
+        auto phi   = 2 * pif * uv.x;
+        auto theta = pif * uv.y;
+
+        auto r     = uv.y > 1 ? r1 : r0;
+        auto x     = cos(phi) * sin(theta) * r;
+        auto y     = sin(phi) * sin(theta) * r;
+        auto z     = cos(theta) * r;
+        auto point = vec3f{x, y, z};
+
+        auto c      = uv.y > 1 ? p1 : p0;
+        auto normal = normalize(point - c);
+        return transform_normal(instance.frame, normal);
+      }
+      */
     } else {
       return transform_normal(instance.frame,
           normalize(
               interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));
     }
-    
+
   } else if (!shape.points.empty()) {
     // ORIGINAL CODE
-    // return transform_normal(instance.frame, normalize(shape.normals[shape.points[element]]));
+    // return transform_normal(instance.frame,
+    // normalize(shape.normals[shape.points[element]]));
 
     // MY CODE
-    if (points_as_spheres){
+    if (points_as_spheres) {
       auto p = shape.points[element];
 
       // From:
@@ -602,17 +823,17 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       auto& center = shape.positions[p];
       auto& radius = shape.radius[p];
 
-      auto theta = 2 * pif * uv.x;
-      auto phi   = pif * uv.y;
+      auto phi   = 2 * pif * uv.x;
+      auto theta = pif * uv.y;
 
-      auto x = cos(theta) * sin(phi);
-      auto y = sin(theta) * sin(phi);
-      auto z = cos(phi);
+      auto x = cos(phi) * sin(theta);
+      auto y = sin(phi) * sin(theta);
+      auto z = cos(theta);
 
-      auto d = vec3f{x, y, z};
+      auto d      = vec3f{x, y, z};
       auto normal = normalize(d);
-
-      return transform_normal(instance.frame, normalize(normal));
+      return transform_normal(instance.frame, normal);
+      // return transform_normal(instance.frame, normalize(normal));
 
     } else {
       return transform_normal(
@@ -777,7 +998,7 @@ vec3f eval_shading_normal(const scene_data& scene,
 
     // MY CODE
     return eval_normal(scene, instance, element, uv, points_as_spheres,
-        lines_as_cones, quads_as_patches);  
+        lines_as_cones, quads_as_patches);
   } else {
     return {0, 0, 0};
   }

@@ -98,7 +98,7 @@ trace_bvh make_trace_bvh(const scene_data& scene, const trace_params& params) {
 // Ray-intersection shortcuts
 static scene_intersection intersect_scene(const trace_bvh& bvh,
     const scene_data& scene, const ray3f& ray, const bool points_as_spheres,
-    const bool lines_as_cones, const bool quads_as_patches, 
+    const bool lines_as_cones, const bool quads_as_patches,
     bool find_any = false) {
   if (bvh.ebvh.ebvh) {
     return intersect_scene_ebvh(bvh.ebvh, scene, ray, find_any);
@@ -114,9 +114,8 @@ static scene_intersection intersect_instance(const trace_bvh& bvh,
   if (bvh.ebvh.ebvh) {
     return intersect_instance_ebvh(bvh.ebvh, scene, instance, ray, find_any);
   } else {
-    return intersect_instance_bvh(
-        bvh.bvh, scene, instance, ray, points_as_spheres, lines_as_cones, 
-        quads_as_patches, find_any);
+    return intersect_instance_bvh(bvh.bvh, scene, instance, ray,
+        points_as_spheres, lines_as_cones, quads_as_patches, find_any);
   }
 }
 
@@ -154,7 +153,7 @@ namespace yocto {
     const scene_intersection& intersection, const vec3f& outgoing,
     const trace_params& params) {
   return eval_shading_position(scene, scene.instances[intersection.instance],
-      intersection.element, intersection.uv, outgoing, params.points_as_spheres, 
+      intersection.element, intersection.uv, outgoing, params.points_as_spheres,
       params.lines_as_cones, params.quads_as_patches);
 }
 // MY CODE: Add FLAGs to switch intersection methods
@@ -379,17 +378,17 @@ static ray3f sample_camera(const camera_data& camera, const vec2i& ij,
 // Sample lights wrt solid angle
 static vec3f sample_lights(const scene_data& scene, const trace_lights& lights,
     const vec3f& position, float rl, float rel, const vec2f& ruv,
-    const bool points_as_sphere, const bool lines_as_cones, 
+    const bool points_as_sphere, const bool lines_as_cones,
     const bool quads_as_patches) {
   auto  light_id = sample_uniform((int)lights.lights.size(), rl);
   auto& light    = lights.lights[light_id];
   if (light.instance != invalidid) {
-    auto& instance  = scene.instances[light.instance];
-    auto& shape     = scene.shapes[instance.shape];
-    auto  element   = sample_discrete(light.elements_cdf, rel);
-    auto  uv        = (!shape.triangles.empty()) ? sample_triangle(ruv) : ruv;
+    auto& instance = scene.instances[light.instance];
+    auto& shape    = scene.shapes[instance.shape];
+    auto  element  = sample_discrete(light.elements_cdf, rel);
+    auto  uv       = (!shape.triangles.empty()) ? sample_triangle(ruv) : ruv;
     // MY CODE: Add FLAGs to switch intersection methods
-    auto  lposition = eval_position(scene, instance, element, uv, 
+    auto lposition = eval_position(scene, instance, element, uv,
         points_as_sphere, lines_as_cones, quads_as_patches);
     return normalize(lposition - position);
   } else if (light.environment != invalidid) {
@@ -414,7 +413,7 @@ static vec3f sample_lights(const scene_data& scene, const trace_lights& lights,
 // Sample lights pdf
 static float sample_lights_pdf(const scene_data& scene, const trace_bvh& bvh,
     const trace_lights& lights, const vec3f& position, const vec3f& direction,
-    const bool points_as_spheres, const bool lines_as_cones, 
+    const bool points_as_spheres, const bool lines_as_cones,
     const bool quads_as_patches) {
   auto pdf = 0.0f;
   for (auto& light : lights.lights) {
@@ -425,9 +424,9 @@ static float sample_lights_pdf(const scene_data& scene, const trace_bvh& bvh,
       auto next_position = position;
       for (auto bounce = 0; bounce < 100; bounce++) {
         // MY CODE: Add FLAGs to switch intersection methods
-        auto intersection = intersect_instance(
-            bvh, scene, light.instance, {next_position, direction}, 
-            points_as_spheres, lines_as_cones, quads_as_patches);
+        auto intersection = intersect_instance(bvh, scene, light.instance,
+            {next_position, direction}, points_as_spheres, lines_as_cones,
+            quads_as_patches);
         if (!intersection.hit) break;
         // accumulate pdf
         // MY CODE: Add FLAGs to switch intersection methods
@@ -498,8 +497,8 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray, 
-        params.points_as_spheres, params.lines_as_cones, 
+    auto intersection = intersect_scene(bvh, scene, ray,
+        params.points_as_spheres, params.lines_as_cones,
         params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
@@ -512,7 +511,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
     if (!volume_stack.empty()) {
       auto& vsdf     = volume_stack.back();
       auto  distance = sample_transmittance(
-           vsdf.density, intersection.distance, rand1f(rng), rand1f(rng));
+          vsdf.density, intersection.distance, rand1f(rng), rand1f(rng));
       weight *= eval_transmittance(vsdf.density, distance) /
                 sample_transmittance_pdf(
                     vsdf.density, distance, intersection.distance);
@@ -540,9 +539,8 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
           (!shape.lines.empty() && params.lines_as_cones) ||
           (!shape.quads.empty() && params.quads_as_patches)) {
         position_test = transform_point(instance.frame, intersection.position);
-        normal_test = transform_normal(instance.frame, intersection.normal);
-        }
-      else {
+        normal_test   = transform_normal(instance.frame, intersection.normal);
+      } else {
         position_test = eval_shading_position(
             scene, intersection, outgoing, params);
         normal_test = eval_shading_normal(
@@ -550,20 +548,21 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       }
 
       // ORIGINAL CODE
-      auto position = eval_shading_position(scene, intersection, outgoing, params);
-      auto normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      auto position = eval_shading_position(
+          scene, intersection, outgoing, params);
+      auto normal = eval_shading_normal(scene, intersection, outgoing, params);
 
       // check if position and position_b are the same
       if (position.x != position_test.x || position.y != position_test.y ||
           position.z != position_test.z) {
         printf("%d position: %f %f %f \n %d position_test: %f %f %f \n", bounce,
-            bounce, position.x, position.y, position.z, position_test.x,
+            position.x, position.y, position.z, bounce, position_test.x,
             position_test.y, position_test.z);
       }
       if (normal.x != normal_test.x || normal.y != normal_test.y ||
           normal.z != normal_test.z) {
         printf("%d normal: %f %f %f \n %d normal_test: %f %f %f \n \n", bounce,
-            bounce, normal.x, normal.y, normal.z, normal_test.x, normal_test.y,
+            normal.x, normal.y, normal.z, bounce, normal_test.x, normal_test.y,
             normal_test.z);
       }
 
@@ -611,9 +610,9 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
             (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
                 0.5f *
                     // MY CODE: Add FLAGs to switch intersection methods
-                    sample_lights_pdf(scene, bvh, lights, position, incoming, 
-                    params.points_as_spheres, params.lines_as_cones,
-                    params.quads_as_patches));
+                    sample_lights_pdf(scene, bvh, lights, position, incoming,
+                        params.points_as_spheres, params.lines_as_cones,
+                        params.quads_as_patches));
       } else {
         incoming = sample_delta(material, normal, outgoing, rand1f(rng));
         weight *= eval_delta(material, normal, outgoing, incoming) /
@@ -653,13 +652,12 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
             params.lines_as_cones, params.quads_as_patches);
       }
       if (incoming == vec3f{0, 0, 0}) break;
-      weight *=
-          eval_scattering(vsdf, outgoing, incoming) /
-          (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
-              // MY CODE: Add FLAGs to switch intersection methods
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
-              params.points_as_spheres, params.lines_as_cones,
-              params.quads_as_patches));
+      weight *= eval_scattering(vsdf, outgoing, incoming) /
+                (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
+                    // MY CODE: Add FLAGs to switch intersection methods
+                    0.5f * sample_lights_pdf(scene, bvh, lights, position,
+                               incoming, params.points_as_spheres,
+                               params.lines_as_cones, params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -698,8 +696,9 @@ static trace_result trace_pathdirect(const scene_data& scene,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
-        params.lines_as_cones, params.quads_as_patches);
+    auto intersection = intersect_scene(bvh, scene, ray,
+        params.points_as_spheres, params.lines_as_cones,
+        params.quads_as_patches);
     if (!intersection.hit) {
       if ((bounce > 0 || !params.envhidden) && next_emission)
         radiance += weight * eval_environment(scene, ray.d);
@@ -711,7 +710,7 @@ static trace_result trace_pathdirect(const scene_data& scene,
     if (!volume_stack.empty()) {
       auto& vsdf     = volume_stack.back();
       auto  distance = sample_transmittance(
-           vsdf.density, intersection.distance, rand1f(rng), rand1f(rng));
+          vsdf.density, intersection.distance, rand1f(rng), rand1f(rng));
       weight *= eval_transmittance(vsdf.density, distance) /
                 sample_transmittance_pdf(
                     vsdf.density, distance, intersection.distance);
@@ -741,7 +740,7 @@ static trace_result trace_pathdirect(const scene_data& scene,
       } else {
         // MY CODE: Add FLAGs to switch intersection methods
         position = eval_shading_position(scene, intersection, outgoing, params);
-        normal = eval_shading_normal(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
       }
       auto material = eval_material(scene, intersection);
 
@@ -777,14 +776,14 @@ static trace_result trace_pathdirect(const scene_data& scene,
             rand1f(rng), rand2f(rng), params.points_as_spheres,
             params.lines_as_cones, params.quads_as_patches);
         // MY CODE: Add FLAGs to switch intersection methods
-        auto pdf = sample_lights_pdf(scene, bvh, lights, position, incoming, 
-            params.points_as_spheres, params.lines_as_cones, 
-            params.quads_as_patches);
+        auto pdf     = sample_lights_pdf(scene, bvh, lights, position, incoming,
+                params.points_as_spheres, params.lines_as_cones,
+                params.quads_as_patches);
         auto bsdfcos = eval_bsdfcos(material, normal, outgoing, incoming);
         if (bsdfcos != vec3f{0, 0, 0} && pdf > 0) {
           // MY CODE: Add FLAGs to switch intersection methods
-          auto intersection = intersect_scene(bvh, scene, {position, incoming}, 
-              params.points_as_spheres, params.lines_as_cones, 
+          auto intersection = intersect_scene(bvh, scene, {position, incoming},
+              params.points_as_spheres, params.lines_as_cones,
               params.quads_as_patches);
           auto emission =
               !intersection.hit
@@ -824,8 +823,8 @@ static trace_result trace_pathdirect(const scene_data& scene,
             (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
                 0.5f *
                     // MY CODE: Add FLAGs to switch intersection methods
-                    sample_lights_pdf(scene, bvh, lights, position, incoming, 
-                        params.points_as_spheres, params.lines_as_cones, 
+                    sample_lights_pdf(scene, bvh, lights, position, incoming,
+                        params.points_as_spheres, params.lines_as_cones,
                         params.quads_as_patches));
       } else {
         incoming = sample_delta(material, normal, outgoing, rand1f(rng));
@@ -864,13 +863,12 @@ static trace_result trace_pathdirect(const scene_data& scene,
             params.lines_as_cones, params.quads_as_patches);
       }
       if (incoming == vec3f{0, 0, 0}) break;
-      weight *=
-          eval_scattering(vsdf, outgoing, incoming) /
-          (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
-              // MY CODE: Add FLAGs to switch intersection methods
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
-                  params.points_as_spheres, params.lines_as_cones, 
-                  params.quads_as_patches));
+      weight *= eval_scattering(vsdf, outgoing, incoming) /
+                (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
+                    // MY CODE: Add FLAGs to switch intersection methods
+                    0.5f * sample_lights_pdf(scene, bvh, lights, position,
+                               incoming, params.points_as_spheres,
+                               params.lines_as_cones, params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -916,10 +914,11 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = next_emission 
-        ? intersect_scene(bvh, scene, ray, params.points_as_spheres, 
-            params.lines_as_cones, params.quads_as_patches)
-        : next_intersection;
+    auto intersection =
+        next_emission
+            ? intersect_scene(bvh, scene, ray, params.points_as_spheres,
+                  params.lines_as_cones, params.quads_as_patches)
+            : next_intersection;
     if (!intersection.hit) {
       if ((bounce > 0 || !params.envhidden) && next_emission)
         radiance += weight * eval_environment(scene, ray.d);
@@ -931,7 +930,7 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
     if (!volume_stack.empty()) {
       auto& vsdf     = volume_stack.back();
       auto  distance = sample_transmittance(
-           vsdf.density, intersection.distance, rand1f(rng), rand1f(rng));
+          vsdf.density, intersection.distance, rand1f(rng), rand1f(rng));
       weight *= eval_transmittance(vsdf.density, distance) /
                 sample_transmittance_pdf(
                     vsdf.density, distance, intersection.distance);
@@ -960,10 +959,8 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
         normal   = transform_direction(instance.frame, intersection.normal);
       } else {
         // MY CODE: Add FLAGs to switch intersection methods
-        position = eval_shading_position(
-            scene, intersection, outgoing, params);
-        normal = eval_shading_normal(
-            scene, intersection, outgoing, params);
+        position = eval_shading_position(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
       }
 
       auto material = eval_material(scene, intersection);
@@ -1008,19 +1005,19 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
                          : sample_bsdfcos(material, normal, outgoing,
                                rand1f(rng), rand2f(rng));
           if (incoming == vec3f{0, 0, 0}) break;
-          auto bsdfcos   = eval_bsdfcos(material, normal, outgoing, incoming);
+          auto bsdfcos = eval_bsdfcos(material, normal, outgoing, incoming);
           // MY CODE: Add FLAGs to switch intersection methods
-          auto light_pdf = sample_lights_pdf(scene, bvh, lights, position, 
-              incoming, params.points_as_spheres, params.lines_as_cones, 
+          auto light_pdf = sample_lights_pdf(scene, bvh, lights, position,
+              incoming, params.points_as_spheres, params.lines_as_cones,
               params.quads_as_patches);
-          auto bsdf_pdf = sample_bsdfcos_pdf(
+          auto bsdf_pdf  = sample_bsdfcos_pdf(
               material, normal, outgoing, incoming);
           auto mis_weight = sample_light
                                 ? mis_heuristic(light_pdf, bsdf_pdf) / light_pdf
                                 : mis_heuristic(bsdf_pdf, light_pdf) / bsdf_pdf;
           if (bsdfcos != vec3f{0, 0, 0} && mis_weight != 0) {
-            auto intersection = intersect_scene( bvh, scene, 
-                {position, incoming}, params.points_as_spheres, 
+            auto intersection = intersect_scene(bvh, scene,
+                {position, incoming}, params.points_as_spheres,
                 params.lines_as_cones, params.quads_as_patches);
             if (!sample_light) next_intersection = intersection;
             auto emission = vec3f{0, 0, 0};
@@ -1031,13 +1028,13 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
                   scene.instances[intersection.instance], intersection.element,
                   intersection.uv);
               emission      = eval_emission(material,
-                      eval_shading_normal(scene,
-                          scene.instances[intersection.instance],
-                          intersection.element, intersection.uv, -incoming,
+                       eval_shading_normal(scene,
+                           scene.instances[intersection.instance],
+                           intersection.element, intersection.uv, -incoming,
                            // MY CODE: Add FLAGs to switch intersection methods
-                          params.points_as_spheres, params.lines_as_cones,
-                          params.quads_as_patches),
-                      -incoming);
+                           params.points_as_spheres, params.lines_as_cones,
+                           params.quads_as_patches),
+                       -incoming);
             }
             radiance += weight * bsdfcos * emission * mis_weight;
           }
@@ -1080,19 +1077,17 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
         next_emission = true;
       } else {
         // MY CODE: Add FLAGs to switch intersection methods
-        incoming = sample_lights(
-            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng), 
-            params.points_as_spheres, params.lines_as_cones, 
-            params.quads_as_patches);
+        incoming      = sample_lights(scene, lights, position, rand1f(rng),
+                 rand1f(rng), rand2f(rng), params.points_as_spheres,
+                 params.lines_as_cones, params.quads_as_patches);
         next_emission = true;
       }
-      weight *=
-          eval_scattering(vsdf, outgoing, incoming) /
-          (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
-              // MY CODE: Add FLAGs to switch intersection methods
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming, 
-                  params.points_as_spheres, params.lines_as_cones, 
-                  params.quads_as_patches));
+      weight *= eval_scattering(vsdf, outgoing, incoming) /
+                (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
+                    // MY CODE: Add FLAGs to switch intersection methods
+                    0.5f * sample_lights_pdf(scene, bvh, lights, position,
+                               incoming, params.points_as_spheres,
+                               params.lines_as_cones, params.quads_as_patches));
 
       // setup next iteration
       ray = {position, incoming};
@@ -1129,8 +1124,9 @@ static trace_result trace_pathtest(const scene_data& scene,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
-        params.lines_as_cones, params.quads_as_patches);
+    auto intersection = intersect_scene(bvh, scene, ray,
+        params.points_as_spheres, params.lines_as_cones,
+        params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1157,7 +1153,7 @@ static trace_result trace_pathtest(const scene_data& scene,
     } else {
       // MY CODE: Add FLAGs to switch intersection methods
       position = eval_shading_position(scene, intersection, outgoing, params);
-      normal = eval_shading_normal(scene, intersection, outgoing, params);
+      normal   = eval_shading_normal(scene, intersection, outgoing, params);
     }
     auto material = eval_material(scene, intersection);
     material.type = material_type::matte;
@@ -1190,8 +1186,8 @@ static trace_result trace_pathtest(const scene_data& scene,
           (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
               // MY CODE: Add FLAGs to switch intersection methods
               0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming,
-              params.points_as_spheres, params.lines_as_cones, 
-              params.quads_as_patches));
+                         params.points_as_spheres, params.lines_as_cones,
+                         params.quads_as_patches));
     } else {
       incoming = sample_delta(material, normal, outgoing, rand1f(rng));
       weight *= eval_delta(material, normal, outgoing, incoming) /
@@ -1231,8 +1227,9 @@ static trace_result trace_naive(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
-        params.lines_as_cones, params.quads_as_patches);
+    auto intersection = intersect_scene(bvh, scene, ray,
+        params.points_as_spheres, params.lines_as_cones,
+        params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1259,7 +1256,7 @@ static trace_result trace_naive(const scene_data& scene, const trace_bvh& bvh,
     } else {
       // MY CODE: Add FLAGs to switch intersection methods
       position = eval_shading_position(scene, intersection, outgoing, params);
-      normal = eval_shading_normal(scene, intersection, outgoing, params);
+      normal   = eval_shading_normal(scene, intersection, outgoing, params);
     }
 
     auto material = eval_material(scene, intersection);
@@ -1330,8 +1327,9 @@ static trace_result trace_eyelight(const scene_data& scene,
   // trace  path
   for (auto bounce = 0; bounce < max(params.bounces, 4); bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
-        params.lines_as_cones, params.quads_as_patches);
+    auto intersection = intersect_scene(bvh, scene, ray,
+        params.points_as_spheres, params.lines_as_cones,
+        params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1359,7 +1357,7 @@ static trace_result trace_eyelight(const scene_data& scene,
     } else {
       // MY CODE: Add FLAGs to switch intersection methods
       position = eval_shading_position(scene, intersection, outgoing, params);
-      normal = eval_shading_normal(scene, intersection, outgoing, params);
+      normal   = eval_shading_normal(scene, intersection, outgoing, params);
     }
 
     auto material = eval_material(scene, intersection);
@@ -1418,8 +1416,9 @@ static trace_result trace_diagram(const scene_data& scene, const trace_bvh& bvh,
   // trace  path
   for (auto bounce = 0; bounce < max(params.bounces, 4); bounce++) {
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
-        params.lines_as_cones, params.quads_as_patches);
+    auto intersection = intersect_scene(bvh, scene, ray,
+        params.points_as_spheres, params.lines_as_cones,
+        params.quads_as_patches);
     if (!intersection.hit) {
       radiance += weight * vec3f{1, 1, 1};
       hit = true;
@@ -1448,7 +1447,7 @@ static trace_result trace_diagram(const scene_data& scene, const trace_bvh& bvh,
     } else {
       // MY CODE: Add FLAGs to switch intersection methods
       position = eval_shading_position(scene, intersection, outgoing, params);
-      normal = eval_shading_normal(scene, intersection, outgoing, params);
+      normal   = eval_shading_normal(scene, intersection, outgoing, params);
     }
     auto material = eval_material(scene, intersection);
 
@@ -1513,8 +1512,9 @@ static trace_result trace_furnace(const scene_data& scene, const trace_bvh& bvh,
     }
 
     // intersect next point
-    auto intersection = intersect_scene(bvh, scene, ray, params.points_as_spheres,
-        params.lines_as_cones, params.quads_as_patches);
+    auto intersection = intersect_scene(bvh, scene, ray,
+        params.points_as_spheres, params.lines_as_cones,
+        params.quads_as_patches);
     if (!intersection.hit) {
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
@@ -1535,7 +1535,7 @@ static trace_result trace_furnace(const scene_data& scene, const trace_bvh& bvh,
     //  - points or points as spheres
     //  - lines or lines as rounded cones
     //  - quads or quads as bilinear patches
-    auto& shape    = scene.shapes[instance.shape];
+    auto& shape = scene.shapes[instance.shape];
     if ((!shape.points.empty() && params.points_as_spheres) ||
         (!shape.lines.empty() && params.lines_as_cones)) {
       position = transform_point(instance.frame, intersection.position);
@@ -1543,9 +1543,9 @@ static trace_result trace_furnace(const scene_data& scene, const trace_bvh& bvh,
     } else {
       // MY CODE: Add FLAGs to switch intersection methods
       position = eval_shading_position(scene, intersection, outgoing, params);
-      normal = eval_shading_normal(scene, intersection, outgoing, params);
+      normal   = eval_shading_normal(scene, intersection, outgoing, params);
     }
-    auto  material = eval_material(scene, instance, element, uv);
+    auto material = eval_material(scene, instance, element, uv);
 
     // handle opacity
     if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
@@ -1631,7 +1631,7 @@ static trace_result trace_falsecolor(const scene_data& scene,
   } else {
     // MY CODE: Add FLAGs to switch intersection methods
     position = eval_shading_position(scene, intersection, outgoing, params);
-    normal = eval_shading_normal(scene, intersection, outgoing, params);
+    normal   = eval_shading_normal(scene, intersection, outgoing, params);
   }
 
   // MY CODE: Add FLAGs to switch intersection methods

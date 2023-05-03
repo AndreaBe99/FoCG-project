@@ -148,8 +148,8 @@ inline vec3f ray_point(const ray3f& ray, float t);
 
 // MY CODE
 // Computes u and v, with u as in intersect_line, and v as in intersect_sphere
-inline vec2f compute_uv(
-    const ray3f& ray, const vec3f& pa, const vec3f& pb, const vec3f& normal);
+inline vec2f compute_cone_uv(const ray3f& ray, const vec3f& p0, const vec3f& p1,
+    float r0, float r1, const vec3f& position, const vec3f& normal);
 
 }  // namespace yocto
 
@@ -377,11 +377,11 @@ inline bool overlap_bbox(const bbox3f& bbox1, const bbox3f& bbox2);
 namespace yocto {
 
 // Axis aligned bounding box represented as a min/max vector pairs.
-inline vec2f& bbox2f::operator[](int i) { return (&min)[i]; }
+inline vec2f&       bbox2f::operator[](int i) { return (&min)[i]; }
 inline const vec2f& bbox2f::operator[](int i) const { return (&min)[i]; }
 
 // Axis aligned bounding box represented as a min/max vector pairs.
-inline vec3f& bbox3f::operator[](int i) { return (&min)[i]; }
+inline vec3f&       bbox3f::operator[](int i) { return (&min)[i]; }
 inline const vec3f& bbox3f::operator[](int i) const { return (&min)[i]; }
 
 // Bounding box properties
@@ -440,25 +440,43 @@ inline vec2f ray_point(const ray2f& ray, float t) { return ray.o + ray.d * t; }
 inline vec3f ray_point(const ray3f& ray, float t) { return ray.o + ray.d * t; }
 
 // MY CODE
-inline vec2f compute_uv(
-    const ray3f& ray, const vec3f& pa, const vec3f& pb, const vec3f& normal) {
+inline vec2f compute_cone_uv(const ray3f& ray, const vec3f& p0, const vec3f& p1,
+    float r0, float r1, const vec3f& position, const vec3f& normal) {
   // NOTE: compute u as in the line intersection
-  // setup intersection params
-  auto iu = ray.d;
-  auto iv = pb - pa;
-  auto iw = ray.o - pa;
-  // compute values to solve a linear system
-  auto  a   = dot(iu, iu);
-  auto  b   = dot(iu, iv);
-  auto  c   = dot(iv, iv);
-  auto  d   = dot(iu, iw);
-  auto  e   = dot(iv, iw);
-  float det = a * c - b * b;
+  // ray.d: ray direction
+  // ray.o: ray origin
+  // p0 and p1: cone extremes
+  // r0 and r1: cone radius at extremes
+  // position: intersection point
+  // normal: intersection normal
+  auto a   = dot(ray.d, ray.d);
+  auto b   = dot(ray.d, p1 - p0);  // ray direction * line direction
+  auto c   = dot(p1 - p0, p1 - p0);
+  auto d   = dot(ray.d, ray.o - p0);
+  auto e   = dot(p1 - p0, ray.o - p0);
+  auto det = a * c - b * b;
+  // compute Parameters on both ray and segment
+  auto s = (a * e - b * d) / det;  // point on the segment
+
   // compute u
-  float u = clamp((a * e - b * d) / det, 0.f, 1.f);
+  // clamp segment param to segment corners
+  auto u = clamp(s, (float)0, (float)1);
 
   // NOTE: compute v as in the sphere intersection
-  float v = acos(clamp(normal.z, -1.0f, 1.0f)) / pif;
+  // auto v = acos(clamp(normal.z, -1.0f, 1.0f)) / pif;
+
+  // TEST
+  // Find the closest points on ray and segment and then check whether
+  // their distance is less then segment radius
+  // D^2(s, t) = |(ray.o + t*ray.d)-(p0 + s(p1-p0))|^2
+  // (s,t) = arg min D^2(s,t)
+
+  // (e + td): position, i.e. point on the ray
+  auto pl  = p0 + (p1 - p0) * u;  // point on the segment
+  auto prl = position - pl;       // (ray.o + t*ray.d)-(p0 + s(p1-p0)
+  auto d2  = dot(prl, prl);       // ^2
+  auto r   = r0 * (1 - u) + r1 * u;
+  auto v   = sqrt(d2) / r;
 
   return {u, v};
 }
@@ -644,8 +662,8 @@ inline vec3f quad_normal(const vec3f& n0, const vec3f& n1, const vec3f& n2,
 
 // Interpolated sphere properties.
 inline vec3f sphere_point(const vec3f p, float r, const vec2f& uv) {
-  return p + r * vec3f{cos(uv.x * 2 * pif) * sin(uv.y * pif),
-                     sin(uv.x * 2 * pif) * sin(uv.y * pif), cos(uv.y * pif)};
+  return p + r* vec3f{cos(uv.x * 2 * pif) * sin(uv.y * pif),
+                 sin(uv.x * 2 * pif) * sin(uv.y * pif), cos(uv.y * pif)};
 }
 inline vec3f sphere_normal(const vec3f p, float r, const vec2f& uv) {
   return normalize(vec3f{cos(uv.x * 2 * pif) * sin(uv.y * pif),
@@ -758,7 +776,7 @@ inline prim_intersection intersect_line(
 
   // compute values to solve a linear system
   auto a   = dot(u, u);
-  auto b   = dot(u, v);
+  auto b   = dot(u, v);  // ray direction * line direction
   auto c   = dot(v, v);
   auto d   = dot(u, w);
   auto e   = dot(v, w);
@@ -769,8 +787,8 @@ inline prim_intersection intersect_line(
   if (det == 0) return {};
 
   // compute Parameters on both ray and segment
-  auto t = (b * e - c * d) / det;
-  auto s = (a * e - b * d) / det;
+  auto t = (b * e - c * d) / det;  // point on the ray
+  auto s = (a * e - b * d) / det;  // point on the segment
 
   // exit if not within bounds
   if (t < ray.tmin || t > ray.tmax) return {};
@@ -779,8 +797,8 @@ inline prim_intersection intersect_line(
   s = clamp(s, (float)0, (float)1);
 
   // compute segment-segment distance on the closest points
-  auto pr  = ray.o + ray.d * t;
-  auto pl  = p0 + (p1 - p0) * s;
+  auto pr  = ray.o + ray.d * t;   // point on the ray
+  auto pl  = p0 + (p1 - p0) * s;  // point on the segment
   auto prl = pr - pl;
 
   // check with the line radius at the same point
@@ -852,7 +870,8 @@ inline prim_intersection intersect_sphere(
   if (t < ray.tmin || t > ray.tmax) return {};
 
   // Compute position and normal
-  // NOTE: inspiration from https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection.html
+  // NOTE: inspiration from
+  // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection.html
   auto position = ray_point(ray, t);
   auto normal   = normalize((position - p) / r);
 
@@ -861,13 +880,11 @@ inline prim_intersection intersect_sphere(
   if (u < 0) u += 1;
   auto v = acos(clamp(normal.z, -1.0f, 1.0f)) / pif;
 
-  // NOTE: In this particular case, the normal is simular to a point on a unit 
+  // NOTE: In this particular case, the normal is simular to a point on a unit
   // sphere centred around the origin. We can thus use the normal coordinates to
   // compute the spherical coordinates of Phit. atan2 returns a value in the
   // range [-pi, pi] and we need to remap it to range [0, 1] acosf returns a
   // value in the range [0, pi] and we also need to remap it to the range [0, 1]
-  // auto u = (1 + atan2(normal.z, normal.x) / pif) * 0.5;
-  // auto v = acosf(normal.y) / pif;
 
   return {{u, v}, t, true, position, normal};
 }
@@ -882,7 +899,7 @@ inline prim_intersection intersect_cone(
 
   // Direction of the cone axis
   vec3f ba = p1 - p0;
-  // Direction of the ray relative to the cone extremes
+  // Direction from the start/end point to the ray origin
   vec3f oa = ray.o - p0;
   vec3f ob = ray.o - p1;
 
@@ -924,11 +941,74 @@ inline prim_intersection intersect_cone(
     vec3f position = ray_point(ray, t);
     vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
 
+    // TEST: Compute uv like a cone
+    // Compute cone inverse mapping
+    auto phi = atan2(position.y, position.x);
+    if (phi < 0.) phi += 2.f * pif;
+
+    // Compute the real apex of the cone
+    auto base_radius      = r0 > r1 ? r0 : r1;
+    auto temp_apex_radius = r0 > r1 ? r1 : r0;
+    auto base             = r0 > r1 ? p0 : p1;
+    auto temp_apex        = r0 > r1 ? p1 : p0;
+    auto apex             = length(temp_apex - base) *
+                (base_radius / (temp_apex_radius - base_radius));
+
+    // Find parametric representation of cone hit
+    float u  = phi / (2.f * pif);
+    float v  = position.z / length(apex - base);
+    auto  uv = vec2f{u, v};
+
+    /*
+    // Follow: Ray Tracing Generalized Tube Primitives: Method and Applications
+    // Compute the cone orientation
+    auto c = (p1 - p0) / length(p1 - p0);
+    // Let A the vertex of the cone
+    // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
+    // r1 / r0 = p_one / p_zero
+    // So the apex is
+    auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
+    auto p_zero = length(p0 - apex);
+    auto p_one  = length(p1 - apex);
+    // Compute the locations of the clipping planes z1 and z2.
+    auto z0 = p_zero - ((r0 * r0) / p_zero);
+    auto z1 = p_one - ((r1 * r1) / p_one);
+    // Compute the width of the cone at the base
+    auto x1      = sqrt(p_one * p_one - r1 * r1);
+    auto r_width = (p_one * r1) / x1;
+    auto w_point = apex - z1;
+
+    // Cylinder polar coordinates
+    auto phi = atan2(position.z, position.x);
+    phi += phi < 0 ? 2 * pif : 0;
+
+    auto u  = phi / (2 * pif);
+    auto v  = position.y / z1;
+    auto uv = vec2f{u, v};*/
+
+    // TEST GPT, FUNZIONA
+    /*
+    // Compute UVs
+    vec3f pp0       = position - p0;
+    float u         = dot(pp0, ba) / dot(ba, ba);
+    vec3f c         = p0 + ba * (u / length(ba));
+    float d         = distance(position, c);
+    float cos_alpha = dot(pp0, ba) / (length(pp0) * length(ba));
+    float sin_alpha = sqrt(1.0 - cos_alpha * cos_alpha);
+    float alpha     = acos(cos_alpha);
+    if (dot(cross(pp0, ba), ray.d) > 0.0) alpha = -alpha;
+    float cos_beta = dot(pp0, position - c) / (d * distance(position, p0));
+    float sin_beta = sqrt(1.0 - cos_beta * cos_beta);
+    float beta     = asin(sin_beta);
+    if (dot(cross(position - c, ba), ray.d) < 0.0) beta = -beta;
+    float phi = beta - alpha;
+    if (phi < 0.0) phi += 2.0 * pi;
+    float v  = phi / (2.0 * pi);
+    auto  uv = vec2f{u, v};
+    */
+    // printf("CONE u: %f, v: %f\n", u, v);
     // compute u and v
-    // vec2f uv = compute_uv(ray, p0, p1, normal);
-    auto u = position.z / length(p0 - p1);
-    auto v = atan2(position.y, position.x);
-    vec2f uv = {u, v};
+    // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
     return {uv, t, true, position, normal};
   }
@@ -945,13 +1025,13 @@ inline prim_intersection intersect_cone(
 
   // Intersection with one of the caps, select the closest one to the ray origin
   if (h1 > 0.0) {
-    r = -m3 - sqrt(h1);
+    r      = -m3 - sqrt(h1);
     normal = (oa + t * ray.d) / r0;
   }
   if (h2 > 0.0) {
     t = -m6 - sqrt(h2);
     if (t < r) {
-      r = t;
+      r      = t;
       normal = (ob + t * ray.d) / r1;
     }
   }
@@ -959,11 +1039,57 @@ inline prim_intersection intersect_cone(
 
   // compute position and normal
   vec3f position = ray_point(ray, t);
+
+  // TEST: Sphere polar coordinates
+  /*
+  auto phi   = atan2(position.z, position.x);
+  auto theta = asin(position.y);
+  auto u     = 1 - (phi + pif) / (2 * pif);
+  auto v     = (theta + pif / 2) / pif;
+  auto uv    = vec2f{u, v};
+  */
+
+  // TEST: Compute uv like a cone
+  // Compute cone inverse mapping
+  auto phi = atan2(position.y, position.x);
+  if (phi < 0.) phi += 2.f * pif;
+
+  // Compute the real apex of the cone
+  auto base_radius      = r0 > r1 ? r0 : r1;
+  auto temp_apex_radius = r0 > r1 ? r1 : r0;
+  auto base             = r0 > r1 ? p0 : p1;
+  auto temp_apex        = r0 > r1 ? p1 : p0;
+  auto apex             = length(temp_apex - base) *
+              (base_radius / (temp_apex_radius - base_radius));
+
+  // Find parametric representation of cone hit
+  float u  = phi / (2.f * pif);
+  float v  = position.z / length(apex - base);
+  auto  uv = vec2f{u, v};
+
+  // TEST GPT
+  /*
+  // Compute UVs
+  vec3f pp0       = position - p0;
+  float u         = dot(pp0, ba) / dot(ba, ba);
+  vec3f c         = p0 + ba * (u / length(ba));
+  float d         = distance(position, c);
+  float cos_alpha = dot(pp0, ba) / (length(pp0) * length(ba));
+  float sin_alpha = sqrt(1.0 - cos_alpha * cos_alpha);
+  float alpha     = acos(cos_alpha);
+  if (dot(cross(pp0, ba), ray.d) > 0.0) alpha = -alpha;
+  float cos_beta = dot(pp0, position - c) / (d * distance(position, p0));
+  float sin_beta = sqrt(1.0 - cos_beta * cos_beta);
+  float beta     = asin(sin_beta);
+  if (dot(cross(position - c, ba), ray.d) < 0.0) beta = -beta;
+  float phi = beta - alpha;
+  if (phi < 0.0) phi += 2.0 * pi;
+  float v  = phi / (2.0 * pi);
+  auto  uv = vec2f{u, v};
+  */
+
   // compute u and v
-  // vec2f uv = compute_uv(ray, p0, p1, normal);
-  auto  u  = position.z / length(p0 - p1);
-  auto  v  = atan2(position.y, position.x);
-  vec2f uv = {u, v};
+  // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
   // intersection occurred: set params and exit
   return {uv, r, true, position, normal};
@@ -1016,7 +1142,7 @@ inline prim_intersection intersect_quad(const ray3f& ray, const vec3f& p0,
 // MY CODE: Intersect a ray with a bilinear patch.
 inline prim_intersection intersect_patch(const ray3f& ray, const vec3f& p0,
     const vec3f& p1, const vec3f& p2, const vec3f& p3,
-    const vector<vec3f>& shape_positions, const vector<vec3f>& shape_normals, 
+    const vector<vec3f>& shape_positions, const vector<vec3f>& shape_normals,
     const vector<vec4i>& shape_quads, const vec4i& q) {
   // NOTE: I decided to 'rename' the parameters to match the code of the
   // paper, I didn't use the names q00, q01, q11, q10 directly to respect the
@@ -1113,24 +1239,20 @@ inline prim_intersection intersect_patch(const ray3f& ray, const vec3f& p0,
 
   // NOTE: From Cool Patches: A Geometric Approach to Ray/Bilinear Patch
   // Intersections, Formula [1], page 2.
-  auto position = q00 * (1 - u) * (1 - v) + 
-                  q10 * u       * (1 - v) +
-                  q01 * (1 - u) * v + 
-                  q11 * u       * v;
+  auto position = q00 * (1 - u) * (1 - v) + q10 * u * (1 - v) +
+                  q01 * (1 - u) * v + q11 * u * v;
 
   // compute normal
   auto normal = vec3f{0, 0, 0};
   if (shape_normals.empty()) {
-      auto du = lerp(e10, q11 - q01, v);
-      auto dv = lerp(e00, e11, u);
-      normal  = cross(du, dv);
+    auto du = lerp(e10, q11 - q01, v);
+    auto dv = lerp(e00, e11, u);
+    normal  = cross(du, dv);
   } else {
     normal = lerp(lerp(shape_normals[q.x], shape_normals[q.y], u),
-                  lerp(shape_normals[q.w], shape_normals[q.z], u), v);
+        lerp(shape_normals[q.w], shape_normals[q.z], u), v);
   }
   normal = normalize(normal);
-
-
 
   return {{u, v}, t, hit, position, normal};
 }
