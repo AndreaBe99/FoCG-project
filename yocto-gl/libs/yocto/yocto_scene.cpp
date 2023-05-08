@@ -328,108 +328,64 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
     auto l = shape.lines[element];
 
     // ORIGINAL CODE
-    return transform_point(instance.frame,
-        interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
+    // return transform_point(instance.frame,
+    // interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
 
     // MY CODE
     if (lines_as_cones) {
-      auto& p0 = shape.positions[l.x];
-      auto& p1 = shape.positions[l.y];
-      auto& r0 = shape.radius[l.x];
-      auto& r1 = shape.radius[l.y];
+      auto p0 = shape.positions[l.x];
+      auto p1 = shape.positions[l.y];
+      auto r0 = shape.radius[l.x];
+      auto r1 = shape.radius[l.y];
 
-      // Compute the real apex of the cone
-      auto base_radius      = r0 > r1 ? r0 : r1;
-      auto temp_apex_radius = r0 > r1 ? r1 : r0;
-      auto base             = r0 > r1 ? p0 : p1;
-      auto temp_apex        = r0 > r1 ? p1 : p0;
-      auto apex             = length(temp_apex - base) *
-                  (base_radius / (temp_apex_radius - base_radius));
+      // Compute the virtual base of the cone
+      // First of all find the virtual base of the cone
+      auto base_radius = r0 > r1 ? r0 : r1;
+      auto base_center = r0 > r1 ? p0 : p1;
+      // Rename the other point
+      auto temp_radius = r0 <= r1 ? r0 : r1;
+      auto temp_center = r0 <= r1 ? p0 : p1;
+      auto phi         = 2 * pif * uv.x;
 
-      auto x = base_radius * cos(uv.x * 2 * pif);
-      auto y = base_radius * sin(uv.x * 2 * pif);
-      auto z = uv.y * length(apex - base);
+      auto x = base_radius * cos(phi);
+      auto y = base_radius * sin(phi);
+      auto z = uv.y;
 
-      auto position = vec3f{x, y, z};
+      // TEST: Compute the virtual cone
+      // From: Ray Tracing Generalized Tube Primitives: Method and
+      // Applications
+      // A cone is described by its apex (apex), orientation (c), and radius
+      // (w) Compute the cone orientation
+      auto c = (base_center - temp_center) / length(base_center - temp_center);
+      // Find the virtual apex of the cone
+      // auto apex = length(base_center - temp_center) * (temp_radius /
+      // (base_radius - temp_radius));
+      // Position of the clipping planes
+      // Defined as p = ||P - apex|| where P is the center of the sphere
+      // we substitute the apex, then
+      auto p_one = length(base_center - temp_center) *
+                   (temp_radius / (base_radius - temp_radius));
+      auto p_two = length(base_center - temp_center) + p_one;
+      // Find the virtual apex of the cone
+      auto apex = temp_center - p_one * c;
+      // Compute the locations of the clipping planes z1 and z2.
+      // z0: distance from the apex to clipping plane of the small sphere
+      auto z_one = p_one - ((temp_radius * temp_radius) / p_one);
+      // z1: distance from the apex to clipping plane of the big sphere
+      auto z_two = p_two - ((base_radius * base_radius) / p_two);
+      // Compute the width of the cone at the base
+      auto x_two = sqrt(p_two * p_two - base_radius * base_radius);
+      // Radius of the cone at the base
+      auto w      = (p_two * base_radius) / x_two;
+      auto height = length(apex - z_one);
+      // Half angle of the cone
+      auto slenth_angle = sqrt(w * w + height * height);
 
-      /*
-      // Compute the direction of the cone axis
-      vec3f ba = p1 - p0;
+      auto center   = c * (height / 2.f) - base_center;
+      auto position = vec3f{x, y, z} + center;
 
-      // Compute the length of the cone axis and the difference between the
-      // radii
-      float l  = length(ba);
-      float rr = r0 - r1;
-
-      // Compute the angle between the cone axis and the ray
-      float theta = atan2(rr, l);
-
-      // Compute the angle between the ray and the plane perpendicular to the
-      // cone axis
-      float phi = 2 * pif * uv.x;
-
-      // Compute the distance from the apex of the cone to the surface point
-      float h = uv.y * l;
-
-      // Compute the position of the point on the surface of the cone
-      vec3f pc  = p0 + ba * (h / l);
-      vec3f dir = normalize(cross(ba, vec3f{1, 0, 0}));
-      if (length(dir) < 0.001f) {
-        dir = normalize(cross(ba, vec3f{0, 1, 0}));
-      }
-      vec3f pa = pc + dir * r0 * cos(theta);
-      vec3f pb = p1 + dir * r1 * cos(theta);
-      vec3f position  = pa * cos(phi) + pb * sin(phi) +
-                dir * (uv.y * rr + r0 * sin(theta));
-
-      // Compute the normal of the point on the surface of the cone
-      //vec3f n = normalize((p - pc) / vec3f{r0, r0, l - h});
-      */
       return transform_point(instance.frame, position);
 
-      // Intesect cone
-      /*
-      if (uv.y >= 0 && uv.y <= 1) {
-        // TEST Follow: Ray Tracing Generalized Tube Primitives: Method and
-        // Applications Compute the cone orientation
-        auto c = (p1 - p0) / length(p1 - p0);
-        // Let A the vertex of the cone
-        // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
-        // r1 / r0 = p_one / p_zero
-        // So the apex is
-        auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
-        auto p_zero = length(p0 - apex);
-        auto p_one  = length(p1 - apex);
-        // Compute the locations of the clipping planes z1 and z2.
-        auto z0 = p_zero - ((r0 * r0) / p_zero);
-        auto z1 = p_one - ((r1 * r1) / p_one);
-        // Compute the width of the cone at the base
-        auto x1      = sqrt(p_one * p_one - r1 * r1);
-        auto r_width = (p_one * r1) / x1;
-        auto w_point = apex - z1;
-
-        auto x = r_width * cos(uv.x);
-        auto y = r_width * sin(uv.x);
-        auto z = uv.y * z1;
-
-        auto point = vec3f{x, y, z};
-
-        return transform_point(instance.frame, point);
-      }
-      // Intersect sphere
-      else {
-        auto phi   = 2 * pif * uv.x;
-        auto theta = pif * uv.y;
-
-        auto r = uv.y > 1 ? r1 : r0;
-        auto x = cos(phi) * sin(theta) * r;
-        auto y = sin(phi) * sin(theta) * r;
-        auto z = cos(theta) * r;
-
-        auto point = vec3f{x, y, z};
-        return transform_point(instance.frame, point);
-      }
-      */
     } else {
       return transform_point(instance.frame,
           interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
@@ -451,6 +407,7 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
       auto& center = shape.positions[p];
       auto& radius = shape.radius[p];
 
+      // Spherical polar coordinates
       auto phi   = 2 * pif * uv.x;
       auto theta = pif * uv.y;
 
@@ -584,50 +541,80 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
 
     // MY CODE
     if (lines_as_cones) {
-      auto& p0 = shape.positions[l.x];
-      auto& p1 = shape.positions[l.y];
-      auto& r0 = shape.radius[l.x];
-      auto& r1 = shape.radius[l.y];
+      auto p0 = shape.positions[l.x];
+      auto p1 = shape.positions[l.y];
+      auto r0 = shape.radius[l.x];
+      auto r1 = shape.radius[l.y];
 
-      // Compute the real apex of the cone
-      auto base_radius      = r0 > r1 ? r0 : r1;
-      auto temp_apex_radius = r0 > r1 ? r1 : r0;
-      auto base             = r0 > r1 ? p0 : p1;
-      auto temp_apex        = r0 > r1 ? p1 : p0;
-      auto apex             = length(temp_apex - base) *
-                  (base_radius / (temp_apex_radius - base_radius));
+      // First of all find the virtual base of the cone
+      auto base_radius = r0 > r1 ? r0 : r1;
+      auto base_center = r0 > r1 ? p0 : p1;
+      // Rename the other point
+      auto temp_radius = r0 <= r1 ? r0 : r1;
+      auto temp_center = r0 <= r1 ? p0 : p1;
+      auto phi         = 2 * pif * uv.x;
 
-      auto x = base_radius * cos(uv.x * 2 * pif);
-      auto y = base_radius * sin(uv.x * 2 * pif);
-      auto z = uv.y * length(apex - base);
+      auto x = base_radius * cos(phi);
+      auto y = base_radius * sin(phi);
+      auto z = uv.y;
 
-      auto position = vec3f{x, y, z};
-      /*
-      // Compute the direction of the cone axis
-      vec3f ba = p1 - p0;
-      // Compute the length of the cone axis and the difference between the
-      // radii
-      float l  = length(ba);
-      float rr = r0 - r1;
-      // Compute the angle between the cone axis and the ray
-      float theta = atan2(rr, l);
-      // Compute the angle between the ray and the plane perpendicular to the
-      // cone axis
-      float phi = 2 * pif * uv.x;
-      // Compute the distance from the apex of the cone to the surface point
-      float h = uv.y * l;
-      // Compute the position of the point on the surface of the cone
-      vec3f pc  = p0 + ba * (h / l);
-      vec3f dir = normalize(cross(ba, vec3f{1, 0, 0}));
-      if (length(dir) < 0.001f) {
-        dir = normalize(cross(ba, vec3f{0, 1, 0}));
-      }
-      vec3f pa = pc + dir * r0 * cos(theta);
-      vec3f pb = p1 + dir * r1 * cos(theta);
-      vec3f position  = pa * cos(phi) + pb * sin(phi) +
-                dir * (uv.y * rr + r0 * sin(theta));
-      // vec3f normal = normalize((p - pc) / vec3f{r0, r0, l - h});
-      */
+      printf("x: %f, y: %f, z: %f\n", x, y, z);
+
+      // TEST: Compute the virtual cone
+      // From: Ray Tracing Generalized Tube Primitives: Method and
+      // Applications
+
+      // A cone is described by its apex (apex), orientation (c), and radius
+      // (w) Compute the cone orientation
+      auto c = (base_center - temp_center) / length(base_center - temp_center);
+      // Find the virtual apex of the cone
+      // auto apex = length(base_center - temp_center) * (temp_radius /
+      // (base_radius - temp_radius));
+      // Position of the clipping planes
+      // Defined as p = ||P - apex|| where P is the center of the sphere
+      // we substitute the apex, then
+      auto p_one = length(base_center - temp_center) *
+                   (temp_radius / (base_radius - temp_radius));
+      auto p_two = length(base_center - temp_center) + p_one;
+      // Find the virtual apex of the cone
+      auto apex = temp_center - p_one * c;
+      // Compute the locations of the clipping planes z1 and z2.
+      // z0: distance from the apex to clipping plane of the small sphere
+      auto z_one = p_one - ((temp_radius * temp_radius) / p_one);
+      // z1: distance from the apex to clipping plane of the big sphere
+      auto z_two = p_two - ((base_radius * base_radius) / p_two);
+      // Compute the width of the cone at the base
+      auto x_two = sqrt(p_two * p_two - base_radius * base_radius);
+      // Radius of the cone at the base
+      auto w      = (p_two * base_radius) / x_two;
+      auto height = length(apex - z_one);
+      // Half angle of the cone
+      auto slenth_angle = sqrt(w * w + height * height);
+
+      printf("c: %f %f %f\n", c.x, c.y, c.z);
+      printf("apex: %f %f %f\n", apex.x, apex.y, apex.z);
+      printf("p_one: %f\n", p_one);
+      printf("p_two: %f\n", p_two);
+      printf("z_one: %f\n", z_one);
+      printf("z_two: %f\n", z_two);
+      printf("x_two: %f\n", x_two);
+      printf("w: %f\n", w);
+      printf("height: %f\n", height);
+
+      auto center   = c * (height / 2.f) - base_center;
+      auto position = vec3f{x, y, z} + center;
+      printf("position 1: %f %f %f\n", position.x, position.y, position.z);
+
+      auto position_vanilla = interpolate_line(
+          shape.positions[l.x], shape.positions[l.y], uv.x);
+      printf("position vanilla: %f %f %f\n", position_vanilla.x,
+          position_vanilla.y, position_vanilla.z);
+
+      position = transform_point(instance.frame, position);
+      printf("position 2: %f %f %f\n", position.x, position.y, position.z);
+
+      printf("p0: %f %f %f\n", p0.x, p0.y, p0.z);
+      printf("p1: %f %f %f\n\n\n", p1.x, p1.y, p1.z);
 
       /*
         To determine if a point P is on one of the two spheres or on the lateral
@@ -651,158 +638,24 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       */
 
       // Compute the distance between point P and the center of each sphere
-      auto d0 = length(position - p0);
-      auto d1 = length(position - p1);
-      // Check if P is on the sphere with radius R0
-      if (abs(d0 - r0) < 1e-6f) {
-        // P is on the sphere with radius R0
-        // p is not between p0 and p1, is on the sphere
-        /* auto phi    = 2 * pif * uv.x;
-        auto theta  = pif * uv.y;
-        auto x      = cos(phi) * sin(theta);
-        auto y      = sin(phi) * sin(theta);
-        auto z      = cos(theta);
-        auto d      = vec3f{x, y, z};
-        auto normal = normalize(d);
-        */
+      auto d0 = distance(position, p0);
+      auto d1 = distance(position, p1);
+      if (((r0 - 0.1 * r0) <= d0) && (d0 <= (r0 + 0.1 * r0))) {
+        printf("P is on the sphere with radius R0\n");
         return transform_normal(instance.frame, normalize(position - p0));
-      } else if (abs(d1 - r1) < 1e-6f) {
-        // P is on the sphere with radius R1
-        // COMMENTED CODE AS BEFORE
+      } else if (((r1 - 0.1 * r1) <= d1) && (d1 <= (r1 + 0.1 * r1))) {
+        printf("P is on the sphere with radius R1\n");
         return transform_normal(instance.frame, normalize(position - p1));
       } else {
+        // printf("P is on the lateral part of the cone\n");
         // P is on the lateral part of the cone
-        // auto normal = normalize(p - pc);
-
-        // Compute the axis vector of the cone
-        /*
-        auto cone_dir = normalize(p1 - p0);
-        // Compute the vector from the apex of the cone to the point P
-        auto point_dir = p - p0;
-        // Project point_dir onto the plane perpendicular to cone_dir
-        auto proj = point_dir - dot(point_dir, cone_dir) * cone_dir;
-        // Compute the surface normal by normalizing the projected vector
-        auto normal = normalize(proj);
-        */
-
-        // TEST
-        /*
-        // Follow: Ray Tracing Generalized Tube Primitives: Method and
-        // Applications
-        // Compute the cone orientation
-        auto c = (p1 - p0) / length(p1 - p0);
-        // Let A the vertex of the cone
-        // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
-        // r1 / r0 = p_one / p_zero
-        // So the apex is
-        auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
-        auto p_zero = length(p0 - apex);
-        auto p_one  = length(p1 - apex);
-        // Compute the locations of the clipping planes z1 and z2.
-        auto z0 = p_zero - ((r0 * r0) / p_zero);
-        auto z1 = p_one - ((r1 * r1) / p_one);
-        // Compute the width of the cone at the base
-        auto x1      = sqrt(p_one * p_one - r1 * r1);
-        auto r_width = (p_one * r1) / x1;
-        auto w_point = apex - z1;
-
-        // Compute the opening angle of the cone, from
-        // https://rechneronline.de/pi/cone.php
-        auto angle = 2 * asin(r0 / p_zero);
-        // Compute the gradient of the cone equation at P
-        auto df_dx = 2 * (p.x - p0.x);
-        auto df_dy = 2 * (p.y - p0.y);
-        auto df_dz = 2 * (p.z - p0.z) * pow(tan(angle), 2);
-        // Compute the cross product of the gradient vectors
-        auto n = vec3f{df_dy * df_dz, df_dz * df_dx, df_dx * df_dy};
-        */
-
-        // Compute cone $\dpdu$ and $\dpdv$
-        auto phiMax = 2 * pif;
-        auto height = length(apex - base);
-        auto dpdu   = vec3f{-phiMax * position.y, phiMax * position.x, 0};
-        auto dpdv   = vec3f{
-            -position.x / (1.f - uv.y), -position.y / (1.f - uv.y), height};
-
-        // Compute cone $\dndu$ and $\dndv$
-        auto d2Pduu = -phiMax * phiMax* vec3f{position.x, position.y, 0.};
-        auto                            d2Pduv = phiMax / (1.f - uv.y) *
-                      vec3f{position.y, -position.x, 0.};
-        auto d2Pdvv = vec3f{0, 0, 0};
-
-        // Compute coefficients for fundamental forms
-        auto E = dot(dpdu, dpdu);
-        auto F = dot(dpdu, dpdv);
-        auto G = dot(dpdv, dpdv);
-        auto N = normalize(cross(dpdu, dpdv));
-
-        // return transform_normal(instance.frame, N);
-
-        auto e = dot(N, d2Pduu);
-        auto f = dot(N, d2Pduv);
-        auto g = dot(N, d2Pdvv);
-
-        // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
-        auto invEGF2 = 1.f / (E * G - F * F);
-        auto dndu    = vec3f{(f * F - e * G) * invEGF2 * dpdu +
-                          (e * F - f * E) * invEGF2 * dpdv};
-        auto dndv    = vec3f{(g * F - f * G) * invEGF2 * dpdu +
-                          (f * F - g * E) * invEGF2 * dpdv};
-
-        auto normal = normalize(cross(dpdu, dpdv));
+        // From: https://www.shadertoy.com/view/MtcXWr
+        auto normal = normalize(
+            position * dot(c, position) / dot(position, position) - c);
 
         return transform_normal(instance.frame, normal);
       }
 
-      /*
-      // Intesect cone
-      if (uv.y >= 0 && uv.y <= 1) {
-        // TEST Follow: Ray Tracing Generalized Tube Primitives: Method and
-        // Applications Compute the cone orientation
-        auto c = (p1 - p0) / length(p1 - p0);
-        // Let A the vertex of the cone
-        // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
-        // r1 / r0 = p_one / p_zero
-        // So the apex is
-        auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
-        auto p_zero = length(p0 - apex);
-        auto p_one  = length(p1 - apex);
-        // Compute the locations of the clipping planes z1 and z2.
-        auto z0 = p_zero - ((r0 * r0) / p_zero);
-        auto z1 = p_one - ((r1 * r1) / p_one);
-        // Compute the width of the cone at the base
-        auto x1      = sqrt(p_one * p_one - r1 * r1);
-        auto r_width = (p_one * r1) / x1;
-        auto w_point = apex - z1;
-
-        auto x        = r_width * cos(uv.x);
-        auto y        = r_width * sin(uv.x);
-        auto z        = uv.y * z1;
-        auto position = vec3f{x, y, z};
-
-        auto dpdu = 2 * pif * vec3f{-position.z, 0, position.x};
-        auto dpdv = vec3f{
-            -position.x / (1 - uv.y), z1, -position.z / (1 - uv.y)};
-        auto normal = normalize(-cross(dpdu, dpdv));
-
-        return transform_normal(instance.frame, normal);
-      }
-      // Intersect sphere
-      else {
-        auto phi   = 2 * pif * uv.x;
-        auto theta = pif * uv.y;
-
-        auto r     = uv.y > 1 ? r1 : r0;
-        auto x     = cos(phi) * sin(theta) * r;
-        auto y     = sin(phi) * sin(theta) * r;
-        auto z     = cos(theta) * r;
-        auto point = vec3f{x, y, z};
-
-        auto c      = uv.y > 1 ? p1 : p0;
-        auto normal = normalize(point - c);
-        return transform_normal(instance.frame, normal);
-      }
-      */
     } else {
       return transform_normal(instance.frame,
           normalize(
@@ -823,6 +676,7 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       auto& center = shape.positions[p];
       auto& radius = shape.radius[p];
 
+      // Sphere Polar Coordinates
       auto phi   = 2 * pif * uv.x;
       auto theta = pif * uv.y;
 
@@ -830,7 +684,8 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       auto y = sin(phi) * sin(theta);
       auto z = cos(theta);
 
-      auto d      = vec3f{x, y, z};
+      auto d = vec3f{x, y, z};
+
       auto normal = normalize(d);
       return transform_normal(instance.frame, normal);
       // return transform_normal(instance.frame, normalize(normal));

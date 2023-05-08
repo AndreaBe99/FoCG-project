@@ -941,73 +941,30 @@ inline prim_intersection intersect_cone(
     vec3f position = ray_point(ray, t);
     vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
 
-    // TEST: Compute uv like a cone
-    // Compute cone inverse mapping
+    // First of all find the virtual base of the cone
+    auto base_radius = r0 > r1 ? r0 : r1;
+    auto base_center = r0 > r1 ? p0 : p1;
+    auto temp_radius = r0 < r1 ? r0 : r1;
+    auto temp_center = r0 < r1 ? p0 : p1;
+    auto c = (base_center - temp_center) / length(base_center - temp_center);
+    auto p_one = length(base_center - temp_center) *
+                 (temp_radius / (base_radius - temp_radius));
+    auto p_two  = length(base_center - temp_center) + p_one;
+    auto apex   = temp_center - p_one * c;
+    auto z_one  = p_one - ((temp_radius * temp_radius) / p_one);
+    auto z_two  = p_two - ((base_radius * base_radius) / p_two);
+    auto x_two  = sqrt(p_two * p_two - base_radius * base_radius);
+    auto w      = (p_two * base_radius) / x_two;
+    auto height = length(apex - z_one);
+
+    // Cylinder Polar Coordinate
     auto phi = atan2(position.y, position.x);
     if (phi < 0.) phi += 2.f * pif;
-
-    // Compute the real apex of the cone
-    auto base_radius      = r0 > r1 ? r0 : r1;
-    auto temp_apex_radius = r0 > r1 ? r1 : r0;
-    auto base             = r0 > r1 ? p0 : p1;
-    auto temp_apex        = r0 > r1 ? p1 : p0;
-    auto apex             = length(temp_apex - base) *
-                (base_radius / (temp_apex_radius - base_radius));
-
-    // Find parametric representation of cone hit
+    //  Find parametric representation of cone hit
     float u  = phi / (2.f * pif);
-    float v  = position.z / length(apex - base);
+    float v  = position.z;
     auto  uv = vec2f{u, v};
 
-    /*
-    // Follow: Ray Tracing Generalized Tube Primitives: Method and Applications
-    // Compute the cone orientation
-    auto c = (p1 - p0) / length(p1 - p0);
-    // Let A the vertex of the cone
-    // Let p_zero = length(p0 - A) and p_one = length(p1 - A)
-    // r1 / r0 = p_one / p_zero
-    // So the apex is
-    auto apex   = length(p1 - p0) * (r0 / (r1 - r0));
-    auto p_zero = length(p0 - apex);
-    auto p_one  = length(p1 - apex);
-    // Compute the locations of the clipping planes z1 and z2.
-    auto z0 = p_zero - ((r0 * r0) / p_zero);
-    auto z1 = p_one - ((r1 * r1) / p_one);
-    // Compute the width of the cone at the base
-    auto x1      = sqrt(p_one * p_one - r1 * r1);
-    auto r_width = (p_one * r1) / x1;
-    auto w_point = apex - z1;
-
-    // Cylinder polar coordinates
-    auto phi = atan2(position.z, position.x);
-    phi += phi < 0 ? 2 * pif : 0;
-
-    auto u  = phi / (2 * pif);
-    auto v  = position.y / z1;
-    auto uv = vec2f{u, v};*/
-
-    // TEST GPT, FUNZIONA
-    /*
-    // Compute UVs
-    vec3f pp0       = position - p0;
-    float u         = dot(pp0, ba) / dot(ba, ba);
-    vec3f c         = p0 + ba * (u / length(ba));
-    float d         = distance(position, c);
-    float cos_alpha = dot(pp0, ba) / (length(pp0) * length(ba));
-    float sin_alpha = sqrt(1.0 - cos_alpha * cos_alpha);
-    float alpha     = acos(cos_alpha);
-    if (dot(cross(pp0, ba), ray.d) > 0.0) alpha = -alpha;
-    float cos_beta = dot(pp0, position - c) / (d * distance(position, p0));
-    float sin_beta = sqrt(1.0 - cos_beta * cos_beta);
-    float beta     = asin(sin_beta);
-    if (dot(cross(position - c, ba), ray.d) < 0.0) beta = -beta;
-    float phi = beta - alpha;
-    if (phi < 0.0) phi += 2.0 * pi;
-    float v  = phi / (2.0 * pi);
-    auto  uv = vec2f{u, v};
-    */
-    // printf("CONE u: %f, v: %f\n", u, v);
-    // compute u and v
     // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
     return {uv, t, true, position, normal};
@@ -1040,58 +997,32 @@ inline prim_intersection intersect_cone(
   // compute position and normal
   vec3f position = ray_point(ray, t);
 
-  // TEST: Sphere polar coordinates
-  /*
-  auto phi   = atan2(position.z, position.x);
-  auto theta = asin(position.y);
-  auto u     = 1 - (phi + pif) / (2 * pif);
-  auto v     = (theta + pif / 2) / pif;
-  auto uv    = vec2f{u, v};
-  */
+  // First of all find the virtual base of the cone
+  auto base_radius = r0 > r1 ? r0 : r1;
+  auto base_center = r0 > r1 ? p0 : p1;
+  auto temp_radius = r0 < r1 ? r0 : r1;
+  auto temp_center = r0 < r1 ? p0 : p1;
+  auto c     = (base_center - temp_center) / length(base_center - temp_center);
+  auto p_one = length(base_center - temp_center) *
+               (temp_radius / (base_radius - temp_radius));
+  auto p_two  = length(base_center - temp_center) + p_one;
+  auto apex   = temp_center - p_one * c;
+  auto z_one  = p_one - ((temp_radius * temp_radius) / p_one);
+  auto z_two  = p_two - ((base_radius * base_radius) / p_two);
+  auto x_two  = sqrt(p_two * p_two - base_radius * base_radius);
+  auto w      = (p_two * base_radius) / x_two;
+  auto height = length(apex - z_one);
 
-  // TEST: Compute uv like a cone
-  // Compute cone inverse mapping
+  // Cylinder Polar Coordinate
   auto phi = atan2(position.y, position.x);
   if (phi < 0.) phi += 2.f * pif;
-
-  // Compute the real apex of the cone
-  auto base_radius      = r0 > r1 ? r0 : r1;
-  auto temp_apex_radius = r0 > r1 ? r1 : r0;
-  auto base             = r0 > r1 ? p0 : p1;
-  auto temp_apex        = r0 > r1 ? p1 : p0;
-  auto apex             = length(temp_apex - base) *
-              (base_radius / (temp_apex_radius - base_radius));
-
-  // Find parametric representation of cone hit
+  //  Find parametric representation of cone hit
   float u  = phi / (2.f * pif);
-  float v  = position.z / length(apex - base);
+  float v  = position.z;
   auto  uv = vec2f{u, v};
 
-  // TEST GPT
-  /*
-  // Compute UVs
-  vec3f pp0       = position - p0;
-  float u         = dot(pp0, ba) / dot(ba, ba);
-  vec3f c         = p0 + ba * (u / length(ba));
-  float d         = distance(position, c);
-  float cos_alpha = dot(pp0, ba) / (length(pp0) * length(ba));
-  float sin_alpha = sqrt(1.0 - cos_alpha * cos_alpha);
-  float alpha     = acos(cos_alpha);
-  if (dot(cross(pp0, ba), ray.d) > 0.0) alpha = -alpha;
-  float cos_beta = dot(pp0, position - c) / (d * distance(position, p0));
-  float sin_beta = sqrt(1.0 - cos_beta * cos_beta);
-  float beta     = asin(sin_beta);
-  if (dot(cross(position - c, ba), ray.d) < 0.0) beta = -beta;
-  float phi = beta - alpha;
-  if (phi < 0.0) phi += 2.0 * pi;
-  float v  = phi / (2.0 * pi);
-  auto  uv = vec2f{u, v};
-  */
-
-  // compute u and v
   // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
-  // intersection occurred: set params and exit
   return {uv, r, true, position, normal};
 }
 

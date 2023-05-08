@@ -362,11 +362,10 @@ static ray3f sample_camera(const camera_data& camera, const vec2i& ij,
     const auto width  = 2.0f;
     const auto offset = 0.5f;
     auto       fuv =
-        width *
-            vec2f{
-                puv.x < 0.5f ? sqrt(2 * puv.x) - 1 : 1 - sqrt(2 - 2 * puv.x),
-                puv.y < 0.5f ? sqrt(2 * puv.y) - 1 : 1 - sqrt(2 - 2 * puv.y),
-            } +
+        width* vec2f{
+            puv.x < 0.5f ? sqrt(2 * puv.x) - 1 : 1 - sqrt(2 - 2 * puv.x),
+            puv.y < 0.5f ? sqrt(2 * puv.y) - 1 : 1 - sqrt(2 - 2 * puv.y),
+        } +
         offset;
     auto uv = vec2f{
         (ij.x + fuv.x) / image_size.x, (ij.y + fuv.y) / image_size.y};
@@ -536,8 +535,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       auto& instance = scene.instances[intersection.instance];
       auto& shape    = scene.shapes[instance.shape];
       if ((!shape.points.empty() && params.points_as_spheres) ||
-          (!shape.lines.empty() && params.lines_as_cones) ||
-          (!shape.quads.empty() && params.quads_as_patches)) {
+          (!shape.lines.empty() && params.lines_as_cones)) {
         position_test = transform_point(instance.frame, intersection.position);
         normal_test   = transform_normal(instance.frame, intersection.normal);
       } else {
@@ -553,7 +551,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       auto normal = eval_shading_normal(scene, intersection, outgoing, params);
 
       // check if position and position_b are the same
-      if (position.x != position_test.x || position.y != position_test.y ||
+      /*if (position.x != position_test.x || position.y != position_test.y ||
           position.z != position_test.z) {
         printf("%d position: %f %f %f \n %d position_test: %f %f %f \n", bounce,
             position.x, position.y, position.z, bounce, position_test.x,
@@ -564,7 +562,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
         printf("%d normal: %f %f %f \n %d normal_test: %f %f %f \n \n", bounce,
             normal.x, normal.y, normal.z, bounce, normal_test.x, normal_test.y,
             normal_test.z);
-      }
+      }*/
 
       auto material = eval_material(scene, intersection);
 
@@ -1420,7 +1418,7 @@ static trace_result trace_diagram(const scene_data& scene, const trace_bvh& bvh,
         params.points_as_spheres, params.lines_as_cones,
         params.quads_as_patches);
     if (!intersection.hit) {
-      radiance += weight * vec3f{1, 1, 1};
+      radiance += weight* vec3f{1, 1, 1};
       hit = true;
       // if (bounce > 0 || !params.envhidden)
       //   radiance += weight * eval_environment(scene, ray.d);
