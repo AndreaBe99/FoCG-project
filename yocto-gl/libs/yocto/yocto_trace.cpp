@@ -551,7 +551,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       auto normal = eval_shading_normal(scene, intersection, outgoing, params);
 
       // check if position and position_b are the same
-      /*if (position.x != position_test.x || position.y != position_test.y ||
+      if (position.x != position_test.x || position.y != position_test.y ||
           position.z != position_test.z) {
         printf("%d position: %f %f %f \n %d position_test: %f %f %f \n", bounce,
             position.x, position.y, position.z, bounce, position_test.x,
@@ -562,7 +562,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
         printf("%d normal: %f %f %f \n %d normal_test: %f %f %f \n \n", bounce,
             normal.x, normal.y, normal.z, bounce, normal_test.x, normal_test.y,
             normal_test.z);
-      }*/
+      }
 
       auto material = eval_material(scene, intersection);
 

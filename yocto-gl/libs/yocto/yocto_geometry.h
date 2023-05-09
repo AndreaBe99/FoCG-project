@@ -942,10 +942,10 @@ inline prim_intersection intersect_cone(
     vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
 
     // First of all find the virtual base of the cone
-    auto base_radius = r0 > r1 ? r0 : r1;
+    /*auto base_radius = r0 > r1 ? r0 : r1;
     auto base_center = r0 > r1 ? p0 : p1;
-    auto temp_radius = r0 < r1 ? r0 : r1;
-    auto temp_center = r0 < r1 ? p0 : p1;
+    auto temp_radius = r0 <= r1 ? r0 : r1;
+    auto temp_center = r0 <= r1 ? p0 : p1;
     auto c = (base_center - temp_center) / length(base_center - temp_center);
     auto p_one = length(base_center - temp_center) *
                  (temp_radius / (base_radius - temp_radius));
@@ -956,14 +956,43 @@ inline prim_intersection intersect_cone(
     auto x_two  = sqrt(p_two * p_two - base_radius * base_radius);
     auto w      = (p_two * base_radius) / x_two;
     auto height = length(apex - z_one);
+    */
 
-    // Cylinder Polar Coordinate
+    auto base_radius = r0 > r1 ? r0 : r1;
+    auto base_center = r0 > r1 ? p0 : p1;
+    auto apex_radius = r0 <= r1 ? r0 : r1;
+    auto apex_center = r0 <= r1 ? p0 : p1;
+
+    // Compute vector AB and AP
+    auto AB = base_center - apex_center;
+    auto AP = position - apex_center;
+
+    // Compute lengths of AB and AP
+    auto len_AB = length(AB);
+    auto len_AP = length(AP);
+
+    // Compute cosine and sine of angle between AB and AP
+    auto cos_theta = dot(AB, AP) / (len_AB * len_AP);
+    auto sin_theta = length(cross(AB, AP)) / (len_AB * len_AP);
+
+    // Compute angle between AB and AP
+    auto theta = acos(cos_theta);
+
+    // Compute angle between x-axis and projection of AP onto x-y plane
+    auto phi = atan2(AP.y, AP.x);
+
+    // Compute polar coordinates u and v
+    auto u = theta;
+    auto v = phi;
+
+    /*
     auto phi = atan2(position.y, position.x);
     if (phi < 0.) phi += 2.f * pif;
     //  Find parametric representation of cone hit
-    float u  = phi / (2.f * pif);
-    float v  = position.z;
-    auto  uv = vec2f{u, v};
+    float    u  = phi / (2.f * pif);
+    float    v  = position.z;
+    */
+    auto uv = vec2f{u, v};
 
     // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
@@ -998,10 +1027,11 @@ inline prim_intersection intersect_cone(
   vec3f position = ray_point(ray, t);
 
   // First of all find the virtual base of the cone
+  /*
   auto base_radius = r0 > r1 ? r0 : r1;
   auto base_center = r0 > r1 ? p0 : p1;
-  auto temp_radius = r0 < r1 ? r0 : r1;
-  auto temp_center = r0 < r1 ? p0 : p1;
+  auto temp_radius = r0 <= r1 ? r0 : r1;
+  auto temp_center = r0 <= r1 ? p0 : p1;
   auto c     = (base_center - temp_center) / length(base_center - temp_center);
   auto p_one = length(base_center - temp_center) *
                (temp_radius / (base_radius - temp_radius));
@@ -1012,14 +1042,44 @@ inline prim_intersection intersect_cone(
   auto x_two  = sqrt(p_two * p_two - base_radius * base_radius);
   auto w      = (p_two * base_radius) / x_two;
   auto height = length(apex - z_one);
+  */
+
+  auto base_radius = r0 > r1 ? r0 : r1;
+  auto base_center = r0 > r1 ? p0 : p1;
+  auto apex_radius = r0 <= r1 ? r0 : r1;
+  auto apex_center = r0 <= r1 ? p0 : p1;
+
+  // Compute vector AB and AP
+  auto AB = base_center - apex_center;
+  auto AP = position - apex_center;
+
+  // Compute lengths of AB and AP
+  auto len_AB = length(AB);
+  auto len_AP = length(AP);
+
+  // Compute cosine and sine of angle between AB and AP
+  auto cos_theta = dot(AB, AP) / (len_AB * len_AP);
+  auto sin_theta = length(cross(AB, AP)) / (len_AB * len_AP);
+
+  // Compute angle between AB and AP
+  auto theta = acos(cos_theta);
+
+  // Compute angle between x-axis and projection of AP onto x-y plane
+  auto phi = atan2(AP.y, AP.x);
+
+  // Compute polar coordinates u and v
+  auto u = theta;
+  auto v = phi;
 
   // Cylinder Polar Coordinate
+  /*
   auto phi = atan2(position.y, position.x);
   if (phi < 0.) phi += 2.f * pif;
   //  Find parametric representation of cone hit
   float u  = phi / (2.f * pif);
   float v  = position.z;
-  auto  uv = vec2f{u, v};
+  */
+  auto uv = vec2f{u, v};
 
   // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
