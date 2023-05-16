@@ -328,8 +328,8 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
     auto l = shape.lines[element];
 
     // ORIGINAL CODE
-    // return transform_point(instance.frame,
-    // interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
+    return transform_point(instance.frame,
+        interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
 
     // MY CODE
     if (lines_as_cones) {
@@ -509,10 +509,9 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
   } else if (!shape.lines.empty()) {
     auto l = shape.lines[element];
     // ORIGINAL CODE
-    /*return transform_normal(instance.frame,
+    return transform_normal(instance.frame,
         normalize(
-            interpolate_line(shape.normals[l.x], shape.normals[l.y],
-       uv.x)));*/
+            interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));
 
     // MY CODE
     if (lines_as_cones) {

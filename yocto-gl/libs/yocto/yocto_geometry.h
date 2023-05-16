@@ -992,9 +992,9 @@ inline prim_intersection intersect_cone(
     float    u  = phi / (2.f * pif);
     float    v  = position.z;
     */
-    auto uv = vec2f{u, v};
+    // auto uv = vec2f{u, v};
 
-    // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
+    vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
     return {uv, t, true, position, normal};
   }
@@ -1079,9 +1079,9 @@ inline prim_intersection intersect_cone(
   float u  = phi / (2.f * pif);
   float v  = position.z;
   */
-  auto uv = vec2f{u, v};
+  // auto uv = vec2f{u, v};
 
-  // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
+  vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
   return {uv, r, true, position, normal};
 }
