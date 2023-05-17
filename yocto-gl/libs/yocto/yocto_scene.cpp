@@ -348,7 +348,6 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
 
       // Compute vector AB
       auto AB = base_center - apex_center;
-
       // Compute vector AP
       auto AP = base_radius * sin(uv.x) * cos(uv.y) * normalize(AB) +
                 base_radius * sin(uv.x) * sin(uv.y) * normalize(AB) +
@@ -356,8 +355,6 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
 
       // Compute point P
       auto position = apex_center + AP;
-
-      // auto position = vec3f{x, y, z};
 
       return transform_point(instance.frame, position);
 
@@ -375,9 +372,9 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
     if (points_as_spheres) {
       auto p = shape.points[element];
 
-      // NOTE: From
-      // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/parametric-and-implicit-surfaces.html
       // From:
+      // - https://www.cl.cam.ac.uk/teaching/1999/AGraphHCI/SMAG/node2.html
+      // -
       // https://stackoverflow.com/questions/7840429/calculate-the-xyz-point-of-a-sphere-given-a-uv-coordinate-of-its-texture
       auto& center = shape.positions[p];
       auto& radius = shape.radius[p];
@@ -386,12 +383,13 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
       auto phi   = 2 * pif * uv.x;
       auto theta = pif * uv.y;
 
-      auto x = cos(phi) * sin(theta) * radius;
-      auto y = sin(phi) * sin(theta) * radius;
-      auto z = cos(theta) * radius;
-      auto d = vec3f{x, y, z};
+      auto x      = cos(phi) * sin(theta) * radius;
+      auto y      = sin(phi) * sin(theta) * radius;
+      auto z      = cos(theta) * radius;
+      auto normal = vec3f{x, y, z};
 
-      auto position = d + center;
+      // Inverse formula of: Normal = Position - Center
+      auto position = normal + center;
       return transform_point(instance.frame, position);
 
     } else {
@@ -482,6 +480,7 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
 
     // MY CODE: Check which intersection method to use
     if (quads_as_patches) {
+      // NOTE: From Cool Patches: A Geometric Approach to Ray/Bilinear Patch
       auto normal = vec3f{0};
       if (shape.normals.empty()) {
         // geometric normal
@@ -539,15 +538,6 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
 
       // Compute point P
       auto position = apex_center + AP;
-      printf("position 1: %f %f %f\n", position.x, position.y, position.z);
-
-      auto position_vanilla = interpolate_line(
-          shape.positions[l.x], shape.positions[l.y], uv.x);
-      printf("position vanilla: %f %f %f\n", position_vanilla.x,
-          position_vanilla.y, position_vanilla.z);
-
-      printf("p0: %f %f %f\n", p0.x, p0.y, p0.z);
-      printf("p1: %f %f %f\n\n\n", p1.x, p1.y, p1.z);
 
       /*
         To determine if a point P is on one of the two spheres or on the lateral
@@ -574,26 +564,50 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       auto d0 = distance(position, p0);
       auto d1 = distance(position, p1);
       if (((r0 - 0.1 * r0) <= d0) && (d0 <= (r0 + 0.1 * r0))) {
-        printf("P is on the sphere with radius R0\n");
+        // P is on the sphere with radius R0
         return transform_normal(instance.frame, normalize(position - p0));
       } else if (((r1 - 0.1 * r1) <= d1) && (d1 <= (r1 + 0.1 * r1))) {
-        printf("P is on the sphere with radius R1\n");
+        // P is on the sphere with radius R1
         return transform_normal(instance.frame, normalize(position - p1));
       } else {
-        // printf("P is on the lateral part of the cone\n");
         // P is on the lateral part of the cone
 
-        // Compute vector orientation of the cone
-        auto c = normalize(apex_center - base_center);
-        // From: https://www.shadertoy.com/view/MtcXWr
-        // auto normal = normalize(position * dot(c, position) / dot(position,
-        // position) - c);
+        // Check if it is a cone or a cylinder
+        if (r0 != r1) {
+          // Compute the real position of the virtual apex. based on the
+          // calculus of the paper Ray Tracing Generalized Tube Primitives:
+          // Method and Applications, Page 4
+          auto c = (base_center - apex_center) /
+                   length(base_center - apex_center);
+          auto p_one = length(base_center - apex_center) *
+                       (apex_radius / (base_radius - apex_radius));
+          auto p_two  = length(base_center - apex_center) + p_one;
+          auto apex   = apex_center - p_one * c;
+          auto z_one  = p_one - ((apex_radius * apex_radius) / p_one);
+          auto z_two  = p_two - ((base_radius * base_radius) / p_two);
+          auto x_two  = sqrt(p_two * p_two - base_radius * base_radius);
+          auto w      = (p_two * base_radius) / x_two;
+          auto height = length(apex - z_one);
 
-        float r = sqrt((position.x - c.x) * (position.x - c.x) +
-                       (position.z - c.z) * (position.z - c.z));
-        auto  n = vec3f{position.x - c.x, r * (base_radius / length(p1 - p0)),
-            position.z - c.z};
-        auto  normal = normalize(n);
+          // Compute vector orientation of the cone
+          // auto c = normalize(apex - base_center);
+          // Normal Formula From :
+          // https://github.com/iceman201/RayTracing/blob/master/Ray%20tracing/Cone.cpp
+          float r = sqrt((position.x - c.x) * (position.x - c.x) +
+                         (position.z - c.z) * (position.z - c.z));
+          auto  n = vec3f{position.x - c.x, r * (base_radius / length(p1 - p0)),
+              position.z - c.z};
+          auto  normal = normalize(n);
+          return transform_normal(instance.frame, normal);
+        }
+
+        // The radius of the cone is the same
+        // Compute vector orientation of the cylinder
+        auto c = normalize(apex_center - base_center);
+        // Normal Formula From:
+        // https://github.com/iceman201/RayTracing/blob/master/Ray%20tracing/Cylinder.cpp
+        auto n      = vec3f{position.x - c.x, 0, position.z - c.z};
+        auto normal = normalize(n);
 
         return transform_normal(instance.frame, normal);
       }
@@ -614,21 +628,22 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       auto p = shape.points[element];
 
       // From:
+      // - https://www.cl.cam.ac.uk/teaching/1999/AGraphHCI/SMAG/node2.html
+      // -
       // https://stackoverflow.com/questions/7840429/calculate-the-xyz-point-of-a-sphere-given-a-uv-coordinate-of-its-texture
-      auto& center = shape.positions[p];
-      auto& radius = shape.radius[p];
+      auto center = shape.positions[p];
+      auto radius = shape.radius[p];
 
       // Sphere Polar Coordinates
       auto phi   = 2 * pif * uv.x;
       auto theta = pif * uv.y;
 
-      auto x = cos(phi) * sin(theta);
-      auto y = sin(phi) * sin(theta);
-      auto z = cos(theta);
+      auto x = cos(phi) * sin(theta) * radius;
+      auto y = sin(phi) * sin(theta) * radius;
+      auto z = cos(theta) * radius;
 
-      auto d = vec3f{x, y, z};
-
-      auto normal = normalize(d);
+      auto normal = vec3f{x, y, z};
+      // auto normal   = normalize(position - center);
       return transform_normal(instance.frame, normal);
       // return transform_normal(instance.frame, normalize(normal));
 

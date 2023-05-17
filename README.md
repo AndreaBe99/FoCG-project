@@ -1,2 +1,87 @@
-# FoCG-project
-Project for Fundamental of Computer Graphics Course
+Projects for the Course Foundation of Computer Graphics
+=======================================================
+
+
+Projects: Rendering Systems
+---------------------------
+
+* **Intersection Primitives**: 1 person in C++
+  * the rendering of points, lines and quads is now too approximate; in this project we will compute these intersections accurately
+  * render points as spheres and lines as capped cones; intersection algorithms can be found [here](https://iquilezles.org/www/articles/intersectors/intersectors.htm) with names Sphere and Rounded Cone
+  * render quads as bilinear patches as shown [here](https://research.nvidia.com/publication/2019-03_cool-patches-geometric-approach-raybilinear-patch-intersections)
+  * to integrate them in our code you have to (a) insert the new intersection functions in `intersect_bvh` in `yocto_bvh`, (b) change the functions `eval_position` e `eval_normal` to compute the new position and normal, or (c) change the data to return the intersection normal and position directly from the intersection call
+  * make test files that show the difference between the methods (I would put a flag inside shapes that switches the intersection methods)
+
+More info at [`markdown/project_guideline.md`](markdown/project_guideline.md).
+
+
+## Test Results
+
+Tests are divided by **vanilla** (dots as dots, lines as lines, and quads as quads) and **enhanced** (dots as spheres, lines as rounded cones, and quads as bilinear patches).
+
+The complete folder with all the tests is [`test`](test/).
+
+To execute a test, you can perform (inside [`yocto-gl`](yocto-gl/) folder):
+
+```bash
+./bin/ytrace --scene "test/file/path"  --output out/file/path --sampler path --samples 256 --resolution 4060 --bounces 8 --camera front
+```
+
+A general guide with major changes in the code is available in [`markdown/ste-by-step_guide.md`](markdown/step-by-step_guide.md).
+
+### Shapes 4 
+
+The image is composed of five objects, starting from the left, a sphere composed of bilinear patches, a point grid, a thick point grid (thus composed of spheres as primitives), a line grid, and finally a thick line grid (thus composed of Rounded Cone as primitives).
+
+#### Vanilla
+![shapes4_vanilla.jpg](test/trace_path/1024-sample_2160-resolution_8-bounce/shapes4_vanilla.jpg)
+
+- samples: 1024, resolution: 2160, bounce: 8.
+
+![shapes4_vanilla_front.jpg](test/trace_path/256-sample_4060-resolution_8-bounce/shapes4_vanilla_front.jpg)
+
+- samples: 256, resolution: 4060, bounce: 8.
+
+#### Enhanced
+
+![shapes4_enhanced.jpg](test/trace_path/1024-sample_2160-resolution_8-bounce/shapes4_enhanced.jpg)
+
+- samples: 1024, resolution: 2160, bounce: 8.
+
+![shapes4_enhanced_front.jpg](test/trace_path/256-sample_4060-resolution_8-bounce/shapes4_enhanced_front.jpg)
+
+- samples: 256, resolution: 4060, bounce: 8.
+
+
+### Features 2
+
+The image consists of five objects, starting from the left, a sphere composed of bilinear patches, a monkey head also composed of bilinear patches, a hairball composed of Rounded Cone like primitives, a sphere of spikes, and finally a rounded cube.
+
+#### Vanilla
+
+![features2_vanilla.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/features2_vanilla.jpg)
+
+* samples: 256, resolution: 2160, bounce: 8.
+
+#### Enhanced
+
+![features2_enhanced.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/features2_enhanced.jpg)
+
+* samples: 256, resolution: 2160, bounce: 8.
+
+
+### Shapes 3
+The image is composed of four different hairball.
+
+#### Vanilla
+
+![shapes3_vanilla.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/shapes3_vanilla.jpg)
+
+* samples: 256, resolution: 2160, bounce: 8.
+
+#### Enhanced
+
+![shapes3_enhanced.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/shapes3_enhanced.jpg)
+
+* samples: 1024, resolution: 2160, bounce: 8.
+

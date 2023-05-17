@@ -942,22 +942,6 @@ inline prim_intersection intersect_cone(
     vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
 
     // First of all find the virtual base of the cone
-    /*auto base_radius = r0 > r1 ? r0 : r1;
-    auto base_center = r0 > r1 ? p0 : p1;
-    auto temp_radius = r0 <= r1 ? r0 : r1;
-    auto temp_center = r0 <= r1 ? p0 : p1;
-    auto c = (base_center - temp_center) / length(base_center - temp_center);
-    auto p_one = length(base_center - temp_center) *
-                 (temp_radius / (base_radius - temp_radius));
-    auto p_two  = length(base_center - temp_center) + p_one;
-    auto apex   = temp_center - p_one * c;
-    auto z_one  = p_one - ((temp_radius * temp_radius) / p_one);
-    auto z_two  = p_two - ((base_radius * base_radius) / p_two);
-    auto x_two  = sqrt(p_two * p_two - base_radius * base_radius);
-    auto w      = (p_two * base_radius) / x_two;
-    auto height = length(apex - z_one);
-    */
-
     auto base_radius = r0 > r1 ? r0 : r1;
     auto base_center = r0 > r1 ? p0 : p1;
     auto apex_radius = r0 <= r1 ? r0 : r1;
@@ -985,16 +969,9 @@ inline prim_intersection intersect_cone(
     auto u = theta;
     auto v = phi;
 
-    /*
-    auto phi = atan2(position.y, position.x);
-    if (phi < 0.) phi += 2.f * pif;
-    //  Find parametric representation of cone hit
-    float    u  = phi / (2.f * pif);
-    float    v  = position.z;
-    */
-    // auto uv = vec2f{u, v};
+    auto uv = vec2f{u, v};
 
-    vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
+    // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
     return {uv, t, true, position, normal};
   }
@@ -1027,23 +1004,6 @@ inline prim_intersection intersect_cone(
   vec3f position = ray_point(ray, t);
 
   // First of all find the virtual base of the cone
-  /*
-  auto base_radius = r0 > r1 ? r0 : r1;
-  auto base_center = r0 > r1 ? p0 : p1;
-  auto temp_radius = r0 <= r1 ? r0 : r1;
-  auto temp_center = r0 <= r1 ? p0 : p1;
-  auto c     = (base_center - temp_center) / length(base_center - temp_center);
-  auto p_one = length(base_center - temp_center) *
-               (temp_radius / (base_radius - temp_radius));
-  auto p_two  = length(base_center - temp_center) + p_one;
-  auto apex   = temp_center - p_one * c;
-  auto z_one  = p_one - ((temp_radius * temp_radius) / p_one);
-  auto z_two  = p_two - ((base_radius * base_radius) / p_two);
-  auto x_two  = sqrt(p_two * p_two - base_radius * base_radius);
-  auto w      = (p_two * base_radius) / x_two;
-  auto height = length(apex - z_one);
-  */
-
   auto base_radius = r0 > r1 ? r0 : r1;
   auto base_center = r0 > r1 ? p0 : p1;
   auto apex_radius = r0 <= r1 ? r0 : r1;
@@ -1068,20 +1028,11 @@ inline prim_intersection intersect_cone(
   auto phi = atan2(AP.y, AP.x);
 
   // Compute polar coordinates u and v
-  auto u = theta;
-  auto v = phi;
+  auto u  = theta;
+  auto v  = phi;
+  auto uv = vec2f{u, v};
 
-  // Cylinder Polar Coordinate
-  /*
-  auto phi = atan2(position.y, position.x);
-  if (phi < 0.) phi += 2.f * pif;
-  //  Find parametric representation of cone hit
-  float u  = phi / (2.f * pif);
-  float v  = position.z;
-  */
-  // auto uv = vec2f{u, v};
-
-  vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
+  // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
   return {uv, r, true, position, normal};
 }

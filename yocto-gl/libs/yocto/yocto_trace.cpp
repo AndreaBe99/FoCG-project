@@ -526,7 +526,7 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       // MY CODE: I decided to change the data to return the intersection normal
       // and position directly from the intersection call, and not to modify the
       // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
-      vec3f position, normal;
+      vec3f position_old, normal_old;
       // NOTE: Like in the eval_position check if there is a shape, and then
       // which method we are using, i.e.:
       //  - points or points as spheres
@@ -534,31 +534,33 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       //  - quads or quads as bilinear patches
       auto& instance = scene.instances[intersection.instance];
       auto& shape    = scene.shapes[instance.shape];
-      if (!shape.lines.empty() && params.lines_as_cones) {
-        position = transform_point(instance.frame, intersection.position);
-        normal   = transform_normal(instance.frame, intersection.normal);
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position_old = transform_point(instance.frame, intersection.position);
+        normal_old   = transform_normal(instance.frame, intersection.normal);
       } else {
-        position = eval_shading_position(scene, intersection, outgoing, params);
-        normal   = eval_shading_normal(scene, intersection, outgoing, params);
+        position_old = eval_shading_position(
+            scene, intersection, outgoing, params);
+        normal_old = eval_shading_normal(scene, intersection, outgoing, params);
       }
 
       // ORIGINAL CODE
-      // auto position = eval_shading_position(scene, intersection, outgoing,
-      // params); auto normal = eval_shading_normal(scene, intersection,
-      // outgoing, params);
+      auto position = eval_shading_position(
+          scene, intersection, outgoing, params);
+      auto normal = eval_shading_normal(scene, intersection, outgoing, params);
 
       // check if position and position_b are the same
-      /*if (position.x != position_test.x || position.y != position_test.y ||
-          position.z != position_test.z) {
+      /*if (position.x != position_old.x || position.y != position_old.y ||
+          position.z != position_old.z) {
         printf("%d position: %f %f %f \n %d position_test: %f %f %f \n", bounce,
-            position.x, position.y, position.z, bounce, position_test.x,
-            position_test.y, position_test.z);
+            position.x, position.y, position.z, bounce, position_old.x,
+            position_old.y, position_old.z);
       }
-      if (normal.x != normal_test.x || normal.y != normal_test.y ||
-          normal.z != normal_test.z) {
+      if (normal.x != normal_old.x || normal.y != normal_old.y ||
+          normal.z != normal_old.z) {
         printf("%d normal: %f %f %f \n %d normal_test: %f %f %f \n \n", bounce,
-            normal.x, normal.y, normal.z, bounce, normal_test.x, normal_test.y,
-            normal_test.z);
+            normal.x, normal.y, normal.z, bounce, normal_old.x, normal_old.y,
+            normal_old.z);
       }*/
 
       auto material = eval_material(scene, intersection);
