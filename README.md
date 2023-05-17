@@ -17,7 +17,7 @@ More info at [`markdown/project_guideline.md`](markdown/project_guideline.md).
 
 ## Test Results
 
-Tests are divided by **vanilla** (dots as dots, lines as lines, and quads as quads) and **enhanced** (dots as spheres, lines as rounded cones, and quads as bilinear patches).
+Tests are divided by **vanilla** (points as points, lines as lines, and quads as quads) and **enhanced** (points as spheres, lines as rounded cones, and quads as bilinear patches).
 
 The complete folder with all the tests is [`test`](test/).
 
@@ -27,7 +27,9 @@ To execute a test, you can perform (inside [`yocto-gl`](yocto-gl/) folder):
 ./bin/ytrace --scene "test/file/path"  --output out/file/path --sampler path --samples 256 --resolution 4060 --bounces 8 --camera front
 ```
 
-A general guide with major changes in the code is available in [`markdown/ste-by-step_guide.md`](markdown/step-by-step_guide.md).
+add `--points --lines --quads` to chnage the intersection mode to **enhanced**.
+
+A general guide with major changes in the code is available in [`markdown/ste-by-step_guide.md`](markdown/step-by-step_guide.md), all change of the code are marked with the comment `// MY CODE`.
 
 ### Shapes 4 
 

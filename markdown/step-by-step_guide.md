@@ -1,17 +1,4 @@
-# Intersection Primitives
-
-The rendering of points, lines and quads is now too approximate; in this project we will compute these intersections accurately:
-
-- render **points as spheres** and **lines as capped cones**; intersection algorithms can be found [here](https://iquilezles.org/www/articles/intersectors/intersectors.htm) with names Sphere and Rounded Cone;
-- render **quads as bilinear patches** as shown [here](https://research.nvidia.com/publication/2019-03_cool-patches-geometric-approach-raybilinear-patch-intersections);
-- to integrate them in our code you have to:
-  1. insert the new intersection functions in `intersect_bvh` in `yocto_bvh`,
-  2. change the functions `eval_position` e `eval_normal` to compute the new position and normal, or
-  3. change the data to return the intersection normal and position directly from the intersection call;
-[intersection-primitives_report.md](intersection-primitives_report.md)
-- make test files that show the difference between the methods (I would put a flag inside shapes that switches the intersection methods).
-
-## Step by step
+# Step by step
 
 1. Add three parameters to `struct trace_params {...}` in `yocto_trace.h`:
 
@@ -238,8 +225,9 @@ The rendering of points, lines and quads is now too approximate; in this project
                 // compute position and normal
                 vec3f position = ray_point(ray, t);
                 vec3f normal   = normalize(d2 *(oa + t* ray.d) - ba * y);
-                // compute u and v
-                vec2f uv = compute_uv(ray, p0, p1, normal);
+                // ...
+                // CODE to compute u and v
+                // ...
                 return {uv, t, true, position, normal};
             }
 
@@ -267,8 +255,10 @@ The rendering of points, lines and quads is now too approximate; in this project
 
             // compute position and normal
             vec3f position = ray_point(ray, t);
-            // compute u and v
-            vec2f uv = compute_uv(ray, p0, p1, normal);
+            
+            // ...
+            // CODE to compute u and v
+            // ...
 
             // intersection occurred: set params and exit
             return {uv, r, true, position, normal};
@@ -398,7 +388,7 @@ The rendering of points, lines and quads is now too approximate; in this project
             }
         ```
 
-6. For each path-trace type function, in `yocto_pathtrace.cpp` adjust the code for:
+6. For the second approach (I implement this approach only for spheres and cones), for each path-trace type function, in `yocto_pathtrace.cpp` adjust the code for:
     - the parameters of `intersect_scene_bvh()`, in all the shader function like `trace_path()` or `trace_pathdirect()`...
 
         ```cpp
@@ -424,8 +414,7 @@ The rendering of points, lines and quads is now too approximate; in this project
             auto& shape    = scene.shapes[instance.shape];
             // NOTE:
             if ((!shape.points.empty() && params.points_speheres) ||
-                (!shape.lines.empty() && params.lines_cones) ||
-                (!shape.quads.empty() && params.quads_patches)) {
+                (!shape.lines.empty() && params.lines_cones)) {
                 position = transform_point(instance.frame, intersection.position);
                 normal   = transform_direction(instance.frame, intersection.normal);
             } else {
@@ -433,3 +422,5 @@ The rendering of points, lines and quads is now too approximate; in this project
                 normal   = eval_shading_normal(scene, intersection, outgoing);
             }
         ``` 
+
+7. For the first approach modify the code of `eval_position()` and `eval_normal()` in `yocto_scene.cpp`, to compute the normal and position for the new primitives.
