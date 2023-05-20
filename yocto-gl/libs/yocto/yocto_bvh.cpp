@@ -443,7 +443,7 @@ void update_scene_bvh(scene_bvh& sbvh, const scene_data& scene,
   for (auto idx : range(bboxes.size())) {
     auto& instance = scene.instances[idx];
     bboxes[idx]    = transform_bbox(
-           instance.frame, sbvh.shapes[instance.shape].bvh.nodes[0].bbox);
+        instance.frame, sbvh.shapes[instance.shape].bvh.nodes[0].bbox);
   }
 
   // update nodes
@@ -459,9 +459,8 @@ namespace yocto {
 
 // MY CODE: Add FLAGs to switch intersection methods
 shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
-    const shape_data& shape, const ray3f& ray_,
-    const bool points_as_spheres, const bool lines_as_cones, 
-    const bool quads_as_patches, bool find_any) {
+    const shape_data& shape, const ray3f& ray_, const bool points_as_spheres,
+    const bool lines_as_cones, const bool quads_as_patches, bool find_any) {
   // get bvh tree
   auto& bvh = sbvh.bvh;
 
@@ -507,29 +506,29 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
       }
     } else if (!shape.points.empty()) {
       for (auto idx = node.start; idx < node.start + node.num; idx++) {
-        auto& p             = shape.points[bvh.primitives[idx]];
+        auto& p = shape.points[bvh.primitives[idx]];
 
         // MY CODE: Check which intersection method to use
         prim_intersection pintersection;
         if (points_as_spheres) {
-          pintersection = intersect_sphere(ray, shape.positions[p], 
-              shape.radius[p]);
+          pintersection = intersect_sphere(
+              ray, shape.positions[p], shape.radius[p]);
         } else {
-          pintersection = intersect_point(ray, shape.positions[p], 
-              shape.radius[p]);
+          pintersection = intersect_point(
+              ray, shape.positions[p], shape.radius[p]);
         }
 
         if (!pintersection.hit) continue;
 
         // MY CODE: Add position and normal
         intersection = {bvh.primitives[idx], pintersection.uv,
-            pintersection.distance, true, pintersection.position, 
+            pintersection.distance, true, pintersection.position,
             pintersection.normal};
         ray.tmax     = pintersection.distance;
       }
     } else if (!shape.lines.empty()) {
       for (auto idx = node.start; idx < node.start + node.num; idx++) {
-        auto& l             = shape.lines[bvh.primitives[idx]];
+        auto& l = shape.lines[bvh.primitives[idx]];
 
         // MY CODE: Check which intersection method to use
         prim_intersection pintersection;
@@ -547,14 +546,14 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
         intersection = {bvh.primitives[idx], pintersection.uv,
             pintersection.distance, true, pintersection.position,
             pintersection.normal};
-        
-        ray.tmax     = pintersection.distance;
+
+        ray.tmax = pintersection.distance;
       }
     } else if (!shape.triangles.empty()) {
       for (auto idx = node.start; idx < node.start + node.num; idx++) {
         auto& t             = shape.triangles[bvh.primitives[idx]];
         auto  pintersection = intersect_triangle(ray, shape.positions[t.x],
-            shape.positions[t.y], shape.positions[t.z]);
+             shape.positions[t.y], shape.positions[t.z]);
         if (!pintersection.hit) continue;
         intersection = {bvh.primitives[idx], pintersection.uv,
             pintersection.distance, true};
@@ -562,13 +561,13 @@ shape_intersection intersect_shape_bvh(const shape_bvh& sbvh,
       }
     } else if (!shape.quads.empty()) {
       for (auto idx = node.start; idx < node.start + node.num; idx++) {
-        auto& q             = shape.quads[bvh.primitives[idx]];
+        auto& q = shape.quads[bvh.primitives[idx]];
 
         // MY CODE: Check which intersection method to use
         prim_intersection pintersection;
         if (quads_as_patches) {
-          pintersection = intersect_patch(ray, shape.positions[q.x], 
-              shape.positions[q.y], shape.positions[q.z], shape.positions[q.w], 
+          pintersection = intersect_patch(ray, shape.positions[q.x],
+              shape.positions[q.y], shape.positions[q.z], shape.positions[q.w],
               shape.positions, shape.normals, shape.quads, q);
         } else {
           pintersection = intersect_quad(ray, shape.positions[q.x],
@@ -645,12 +644,12 @@ scene_intersection intersect_scene_bvh(const scene_bvh& sbvh,
       for (auto idx = node.start; idx < node.start + node.num; idx++) {
         auto& instance_ = scene.instances[bvh.primitives[idx]];
         auto  inv_ray   = transform_ray(inverse(instance_.frame, true), ray);
-        
+
         // MY CODE: Add FLAGs to switch intersection methods
-        auto  sintersection = intersect_shape_bvh(sbvh.shapes[instance_.shape],
-             scene.shapes[instance_.shape], inv_ray, points_as_spheres, 
-             lines_as_cones, quads_as_patches, find_any);
-        
+        auto sintersection = intersect_shape_bvh(sbvh.shapes[instance_.shape],
+            scene.shapes[instance_.shape], inv_ray, points_as_spheres,
+            lines_as_cones, quads_as_patches, find_any);
+
         if (!sintersection.hit) continue;
 
         // MY CODE: I have modified scene_intersection struct to include the
@@ -660,7 +659,7 @@ scene_intersection intersect_scene_bvh(const scene_bvh& sbvh,
             sintersection.uv, sintersection.distance, true,
             sintersection.position, sintersection.normal};
 
-        ray.tmax     = sintersection.distance;
+        ray.tmax = sintersection.distance;
       }
     }
 
@@ -676,13 +675,13 @@ scene_intersection intersect_instance_bvh(const scene_bvh& sbvh,
     const scene_data& scene, int instance_, const ray3f& ray,
     const bool points_as_spheres, const bool lines_as_cones,
     const bool quads_as_patches, bool find_any) {
-  auto& instance     = scene.instances[instance_];
-  auto  inv_ray      = transform_ray(inverse(instance.frame, true), ray);
+  auto& instance = scene.instances[instance_];
+  auto  inv_ray  = transform_ray(inverse(instance.frame, true), ray);
 
   // MY CODE: Add FLAGs to switch intersection methods
-  auto  intersection = intersect_shape_bvh(sbvh.shapes[instance.shape],
-       scene.shapes[instance.shape], inv_ray, points_as_spheres, lines_as_cones, 
-       quads_as_patches, find_any);
+  auto intersection = intersect_shape_bvh(sbvh.shapes[instance.shape],
+      scene.shapes[instance.shape], inv_ray, points_as_spheres, lines_as_cones,
+      quads_as_patches, find_any);
   if (!intersection.hit) return {};
 
   // MY CODE: I have modified scene_intersection struct to include the
@@ -736,7 +735,7 @@ shape_intersection overlap_shape_bvh(const shape_bvh& sbvh,
         auto  primitive     = bvh.primitives[node.start + idx];
         auto& p             = shape.points[primitive];
         auto  eintersection = overlap_point(
-             pos, max_distance, shape.positions[p], shape.radius[p]);
+            pos, max_distance, shape.positions[p], shape.radius[p]);
         if (!eintersection.hit) continue;
         intersection = {
             primitive, eintersection.uv, eintersection.distance, true};
@@ -967,7 +966,7 @@ shape_ebvh make_shape_ebvh(const shape_data& shape, bool highquality) {
   auto sbvh    = shape_ebvh{};
   auto edevice = embree_device();
   sbvh.ebvh    = unique_ptr<void, void (*)(void*)>{
-         rtcNewScene(edevice), &clear_ebvh};
+      rtcNewScene(edevice), &clear_ebvh};
   auto escene = (RTCScene)sbvh.ebvh.get();
   if (highquality) {
     rtcSetSceneBuildQuality(escene, RTC_BUILD_QUALITY_HIGH);
@@ -1003,7 +1002,7 @@ shape_ebvh make_shape_ebvh(const shape_data& shape, bool highquality) {
     auto embree_positions = rtcSetNewGeometryBuffer(egeometry,
         RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, 4 * 4, epositions.size());
     auto embree_lines     = rtcSetNewGeometryBuffer(
-            egeometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT, 4, elines.size());
+        egeometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT, 4, elines.size());
     memcpy(embree_positions, epositions.data(), epositions.size() * 16);
     memcpy(embree_lines, elines.data(), elines.size() * 4);
     rtcCommitGeometry(egeometry);
@@ -1066,7 +1065,7 @@ scene_ebvh make_scene_ebvh(
   // scene bvh
   auto edevice = embree_device();
   sbvh.ebvh    = unique_ptr<void, void (*)(void*)>{
-         rtcNewScene(edevice), &clear_ebvh};
+      rtcNewScene(edevice), &clear_ebvh};
   auto escene = (RTCScene)sbvh.ebvh.get();
   if (highquality) {
     rtcSetSceneBuildQuality(escene, RTC_BUILD_QUALITY_HIGH);

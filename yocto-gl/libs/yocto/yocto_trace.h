@@ -112,9 +112,12 @@ struct trace_params {
   int                   batch          = 1;
 
   // MY CODE: Add FLAGs to switch intersection methods
-  bool points_as_spheres  = false;
-  bool lines_as_cones     = false;
-  bool quads_as_patches   = false;
+  bool points_as_spheres = false;
+  bool lines_as_cones    = false;
+  bool quads_as_patches  = false;
+  // set as False to compute normal and position in the intersection
+  // function, True to compute it in yocto_scene
+  bool intersection_method = false;
 };
 
 // Progressively computes an image.

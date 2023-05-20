@@ -83,6 +83,9 @@ void run(const vector<string>& args) {
   add_option(cli, "points", params.points_as_spheres, "points as spheres");
   add_option(cli, "lines", params.lines_as_cones, "lines as cones");
   add_option(cli, "quads", params.quads_as_patches, "quads as patches");
+  // MY CODE: Add FLAGs to select between two intersection methods
+  add_option(cli, "intersection", params.intersection_method,
+      "set as False to compute normal and position in the intersection function, True to compute it in yocto_scene");
 
   add_option(cli, "dumpparams", dumpname, "dump params filename");
   add_option(cli, "edit", edit, "edit interactively");

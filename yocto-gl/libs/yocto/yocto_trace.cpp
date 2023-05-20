@@ -523,44 +523,53 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       // prepare shading point
       auto outgoing = -ray.d;
 
-      // MY CODE: I decided to change the data to return the intersection normal
-      // and position directly from the intersection call, and not to modify the
-      // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
-      vec3f position_old, normal_old;
-      // NOTE: Like in the eval_position check if there is a shape, and then
-      // which method we are using, i.e.:
-      //  - points or points as spheres
-      //  - lines or lines as rounded cones
-      //  - quads or quads as bilinear patches
-      auto& instance = scene.instances[intersection.instance];
-      auto& shape    = scene.shapes[instance.shape];
-      if ((!shape.points.empty() && params.points_as_spheres) ||
-          (!shape.lines.empty() && params.lines_as_cones)) {
-        position_old = transform_point(instance.frame, intersection.position);
-        normal_old   = transform_normal(instance.frame, intersection.normal);
+      // ORIGINAL CODE
+      // auto position = eval_shading_position( scene, intersection, outgoing,
+      // params);
+      /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+      /// params);
+
+      // MY CODE: As default use values of normal and position for Spheres and
+      // Cones returned by intersection function. If params.intersection_method
+      // is true, then compute normal and position in eval_shading_position and
+      // eval_shading_normal functions.
+      vec3f position, normal;
+      if (params.intersection_method) {
+        // Compute normal and position in yocto_scene.{h/cpp}
+        position = eval_shading_position(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
       } else {
-        position_old = eval_shading_position(
-            scene, intersection, outgoing, params);
-        normal_old = eval_shading_normal(scene, intersection, outgoing, params);
+        // Compute normal and position in yocto_geometry.h
+        // NOTE: Like in the eval_position check if there is a shape, and then
+        // which method we are using, i.e.:
+        //  - points or points as spheres
+        //  - lines or lines as rounded cones
+        //  - quads or quads as bilinear patches
+        auto& instance = scene.instances[intersection.instance];
+        auto& shape    = scene.shapes[instance.shape];
+        if ((!shape.points.empty() && params.points_as_spheres) ||
+            (!shape.lines.empty() && params.lines_as_cones)) {
+          position = transform_point(instance.frame, intersection.position);
+          normal   = transform_normal(instance.frame, intersection.normal);
+        } else {
+          position = eval_shading_position(
+              scene, intersection, outgoing, params);
+          normal = eval_shading_normal(scene, intersection, outgoing, params);
+        }
       }
 
-      // ORIGINAL CODE
-      auto position = eval_shading_position(
-          scene, intersection, outgoing, params);
-      auto normal = eval_shading_normal(scene, intersection, outgoing, params);
-
-      // check if position and position_b are the same
+      // TEST: check if position and position_b are the same
       /*if (position.x != position_old.x || position.y != position_old.y ||
           position.z != position_old.z) {
-        printf("%d position: %f %f %f \n %d position_test: %f %f %f \n", bounce,
-            position.x, position.y, position.z, bounce, position_old.x,
+        printf("%d position sce: %f %f %f \n %d position geo: %f %f %f \n",
+            bounce, position.x, position.y, position.z, bounce, position_old.x,
             position_old.y, position_old.z);
       }
       if (normal.x != normal_old.x || normal.y != normal_old.y ||
           normal.z != normal_old.z) {
-        printf("%d normal: %f %f %f \n %d normal_test: %f %f %f \n \n", bounce,
-            normal.x, normal.y, normal.z, bounce, normal_old.x, normal_old.y,
-            normal_old.z);
+        printf("%d normal sce: %f %f %f \n %d normal geo: %f %f %f \n \n",
+            bounce, normal.x, normal.y, normal.z, bounce, normal_old.x,
+            normal_old.y, normal_old.z);
       }*/
 
       auto material = eval_material(scene, intersection);
@@ -719,26 +728,41 @@ static trace_result trace_pathdirect(const scene_data& scene,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      // MY CODE: I decided to change the data to return the intersection normal
-      // and position directly from the intersection call, and not to modify the
-      // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+      // ORIGINAL CODE
+      // auto position = eval_shading_position( scene, intersection, outgoing,
+      // params);
+      /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+      /// params);
+
+      // MY CODE: As default use values of normal and position for Spheres and
+      // Cones returned by intersection function. If params.intersection_method
+      // is true, then compute normal and position in eval_shading_position and
+      // eval_shading_normal functions.
       vec3f position, normal;
-      // NOTE: Like in the eval_position check if there is a shape, and then
-      // which method we are using, i.e.:
-      //  - points or points as spheres
-      //  - lines or lines as rounded cones
-      //  - quads or quads as bilinear patches
-      auto& instance = scene.instances[intersection.instance];
-      auto& shape    = scene.shapes[instance.shape];
-      if ((!shape.points.empty() && params.points_as_spheres) ||
-          (!shape.lines.empty() && params.lines_as_cones)) {
-        position = transform_point(instance.frame, intersection.position);
-        normal   = transform_direction(instance.frame, intersection.normal);
-      } else {
-        // MY CODE: Add FLAGs to switch intersection methods
+      if (params.intersection_method) {
+        // Compute normal and position in yocto_scene.{h/cpp}
         position = eval_shading_position(scene, intersection, outgoing, params);
         normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      } else {
+        // Compute normal and position in yocto_geometry.h
+        // NOTE: Like in the eval_position check if there is a shape, and then
+        // which method we are using, i.e.:
+        //  - points or points as spheres
+        //  - lines or lines as rounded cones
+        //  - quads or quads as bilinear patches
+        auto& instance = scene.instances[intersection.instance];
+        auto& shape    = scene.shapes[instance.shape];
+        if ((!shape.points.empty() && params.points_as_spheres) ||
+            (!shape.lines.empty() && params.lines_as_cones)) {
+          position = transform_point(instance.frame, intersection.position);
+          normal   = transform_normal(instance.frame, intersection.normal);
+        } else {
+          position = eval_shading_position(
+              scene, intersection, outgoing, params);
+          normal = eval_shading_normal(scene, intersection, outgoing, params);
+        }
       }
+
       auto material = eval_material(scene, intersection);
 
       // correct roughness
@@ -939,25 +963,39 @@ static trace_result trace_pathmis(const scene_data& scene, const trace_bvh& bvh,
     if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
-      // MY CODE: I decided to change the data to return the intersection normal
-      // and position directly from the intersection call, and not to modify the
-      // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+      // ORIGINAL CODE
+      // auto position = eval_shading_position( scene, intersection, outgoing,
+      // params);
+      /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+      /// params);
+
+      // MY CODE: As default use values of normal and position for Spheres and
+      // Cones returned by intersection function. If params.intersection_method
+      // is true, then compute normal and position in eval_shading_position and
+      // eval_shading_normal functions.
       vec3f position, normal;
-      // NOTE: Like in the eval_position check if there is a shape, and then
-      // which method we are using, i.e.:
-      //  - points or points as spheres
-      //  - lines or lines as rounded cones
-      //  - quads or quads as bilinear patches
-      auto& instance = scene.instances[intersection.instance];
-      auto& shape    = scene.shapes[instance.shape];
-      if ((!shape.points.empty() && params.points_as_spheres) ||
-          (!shape.lines.empty() && params.lines_as_cones)) {
-        position = transform_point(instance.frame, intersection.position);
-        normal   = transform_direction(instance.frame, intersection.normal);
-      } else {
-        // MY CODE: Add FLAGs to switch intersection methods
+      if (params.intersection_method) {
+        // Compute normal and position in yocto_scene.{h/cpp}
         position = eval_shading_position(scene, intersection, outgoing, params);
         normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      } else {
+        // Compute normal and position in yocto_geometry.h
+        // NOTE: Like in the eval_position check if there is a shape, and then
+        // which method we are using, i.e.:
+        //  - points or points as spheres
+        //  - lines or lines as rounded cones
+        //  - quads or quads as bilinear patches
+        auto& instance = scene.instances[intersection.instance];
+        auto& shape    = scene.shapes[instance.shape];
+        if ((!shape.points.empty() && params.points_as_spheres) ||
+            (!shape.lines.empty() && params.lines_as_cones)) {
+          position = transform_point(instance.frame, intersection.position);
+          normal   = transform_normal(instance.frame, intersection.normal);
+        } else {
+          position = eval_shading_position(
+              scene, intersection, outgoing, params);
+          normal = eval_shading_normal(scene, intersection, outgoing, params);
+        }
       }
 
       auto material = eval_material(scene, intersection);
@@ -1132,26 +1170,40 @@ static trace_result trace_pathtest(const scene_data& scene,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    // MY CODE: I decided to change the data to return the intersection normal
-    // and position directly from the intersection call, and not to modify the
-    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    // ORIGINAL CODE
+    // auto position = eval_shading_position( scene, intersection, outgoing,
+    // params);
+    /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+    /// params);
+
+    // MY CODE: As default use values of normal and position for Spheres and
+    // Cones returned by intersection function. If params.intersection_method
+    // is true, then compute normal and position in eval_shading_position and
+    // eval_shading_normal functions.
     vec3f position, normal;
-    // NOTE: Like in the eval_position check if there is a shape, and then
-    // which method we are using, i.e.:
-    //  - points or points as spheres
-    //  - lines or lines as rounded cones
-    //  - quads or quads as bilinear patches
-    auto& instance = scene.instances[intersection.instance];
-    auto& shape    = scene.shapes[instance.shape];
-    if ((!shape.points.empty() && params.points_as_spheres) ||
-        (!shape.lines.empty() && params.lines_as_cones)) {
-      position = transform_point(instance.frame, intersection.position);
-      normal   = transform_direction(instance.frame, intersection.normal);
-    } else {
-      // MY CODE: Add FLAGs to switch intersection methods
+    if (params.intersection_method) {
+      // Compute normal and position in yocto_scene.{h/cpp}
       position = eval_shading_position(scene, intersection, outgoing, params);
       normal   = eval_shading_normal(scene, intersection, outgoing, params);
+    } else {
+      // Compute normal and position in yocto_geometry.h
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_normal(instance.frame, intersection.normal);
+      } else {
+        position = eval_shading_position(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      }
     }
+
     auto material = eval_material(scene, intersection);
     material.type = material_type::matte;
 
@@ -1235,25 +1287,38 @@ static trace_result trace_naive(const scene_data& scene, const trace_bvh& bvh,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    // MY CODE: I decided to change the data to return the intersection normal
-    // and position directly from the intersection call, and not to modify the
-    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    // ORIGINAL CODE
+    // auto position = eval_shading_position( scene, intersection, outgoing,
+    // params);
+    /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+    /// params);
+
+    // MY CODE: As default use values of normal and position for Spheres and
+    // Cones returned by intersection function. If params.intersection_method
+    // is true, then compute normal and position in eval_shading_position and
+    // eval_shading_normal functions.
     vec3f position, normal;
-    // NOTE: Like in the eval_position check if there is a shape, and then
-    // which method we are using, i.e.:
-    //  - points or points as spheres
-    //  - lines or lines as rounded cones
-    //  - quads or quads as bilinear patches
-    auto& instance = scene.instances[intersection.instance];
-    auto& shape    = scene.shapes[instance.shape];
-    if ((!shape.points.empty() && params.points_as_spheres) ||
-        (!shape.lines.empty() && params.lines_as_cones)) {
-      position = transform_point(instance.frame, intersection.position);
-      normal   = transform_direction(instance.frame, intersection.normal);
-    } else {
-      // MY CODE: Add FLAGs to switch intersection methods
+    if (params.intersection_method) {
+      // Compute normal and position in yocto_scene.{h/cpp}
       position = eval_shading_position(scene, intersection, outgoing, params);
       normal   = eval_shading_normal(scene, intersection, outgoing, params);
+    } else {
+      // Compute normal and position in yocto_geometry.h
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_normal(instance.frame, intersection.normal);
+      } else {
+        position = eval_shading_position(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      }
     }
 
     auto material = eval_material(scene, intersection);
@@ -1336,25 +1401,38 @@ static trace_result trace_eyelight(const scene_data& scene,
     // prepare shading point
     auto outgoing = -ray.d;
 
-    // MY CODE: I decided to change the data to return the intersection normal
-    // and position directly from the intersection call, and not to modify the
-    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    // ORIGINAL CODE
+    // auto position = eval_shading_position( scene, intersection, outgoing,
+    // params);
+    /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+    /// params);
+
+    // MY CODE: As default use values of normal and position for Spheres and
+    // Cones returned by intersection function. If params.intersection_method
+    // is true, then compute normal and position in eval_shading_position and
+    // eval_shading_normal functions.
     vec3f position, normal;
-    // NOTE: Like in the eval_position check if there is a shape, and then
-    // which method we are using, i.e.:
-    //  - points or points as spheres
-    //  - lines or lines as rounded cones
-    //  - quads or quads as bilinear patches
-    auto& instance = scene.instances[intersection.instance];
-    auto& shape    = scene.shapes[instance.shape];
-    if ((!shape.points.empty() && params.points_as_spheres) ||
-        (!shape.lines.empty() && params.lines_as_cones)) {
-      position = transform_point(instance.frame, intersection.position);
-      normal   = transform_direction(instance.frame, intersection.normal);
-    } else {
-      // MY CODE: Add FLAGs to switch intersection methods
+    if (params.intersection_method) {
+      // Compute normal and position in yocto_scene.{h/cpp}
       position = eval_shading_position(scene, intersection, outgoing, params);
       normal   = eval_shading_normal(scene, intersection, outgoing, params);
+    } else {
+      // Compute normal and position in yocto_geometry.h
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_normal(instance.frame, intersection.normal);
+      } else {
+        position = eval_shading_position(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      }
     }
 
     auto material = eval_material(scene, intersection);
@@ -1426,25 +1504,38 @@ static trace_result trace_diagram(const scene_data& scene, const trace_bvh& bvh,
 
     // prepare shading point
     auto outgoing = -ray.d;
-    // MY CODE: I decided to change the data to return the intersection normal
-    // and position directly from the intersection call, and not to modify the
-    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    // ORIGINAL CODE
+    // auto position = eval_shading_position( scene, intersection, outgoing,
+    // params);
+    /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+    /// params);
+
+    // MY CODE: As default use values of normal and position for Spheres and
+    // Cones returned by intersection function. If params.intersection_method
+    // is true, then compute normal and position in eval_shading_position and
+    // eval_shading_normal functions.
     vec3f position, normal;
-    // NOTE: Like in the eval_position check if there is a shape, and then
-    // which method we are using, i.e.:
-    //  - points or points as spheres
-    //  - lines or lines as rounded cones
-    //  - quads or quads as bilinear patches
-    auto& instance = scene.instances[intersection.instance];
-    auto& shape    = scene.shapes[instance.shape];
-    if ((!shape.points.empty() && params.points_as_spheres) ||
-        (!shape.lines.empty() && params.lines_as_cones)) {
-      position = transform_point(instance.frame, intersection.position);
-      normal   = transform_direction(instance.frame, intersection.normal);
-    } else {
-      // MY CODE: Add FLAGs to switch intersection methods
+    if (params.intersection_method) {
+      // Compute normal and position in yocto_scene.{h/cpp}
       position = eval_shading_position(scene, intersection, outgoing, params);
       normal   = eval_shading_normal(scene, intersection, outgoing, params);
+    } else {
+      // Compute normal and position in yocto_geometry.h
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_normal(instance.frame, intersection.normal);
+      } else {
+        position = eval_shading_position(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      }
     }
     auto material = eval_material(scene, intersection);
 
@@ -1523,24 +1614,38 @@ static trace_result trace_furnace(const scene_data& scene, const trace_bvh& bvh,
     auto& instance = scene.instances[intersection.instance];
     auto  element  = intersection.element;
     auto  uv       = intersection.uv;
-    // MY CODE: I decided to change the data to return the intersection normal
-    // and position directly from the intersection call, and not to modify the
-    // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+    // ORIGINAL CODE
+    // auto position = eval_shading_position( scene, intersection, outgoing,
+    // params);
+    /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+    /// params);
+
+    // MY CODE: As default use values of normal and position for Spheres and
+    // Cones returned by intersection function. If params.intersection_method
+    // is true, then compute normal and position in eval_shading_position and
+    // eval_shading_normal functions.
     vec3f position, normal;
-    // NOTE: Like in the eval_position check if there is a shape, and then
-    // which method we are using, i.e.:
-    //  - points or points as spheres
-    //  - lines or lines as rounded cones
-    //  - quads or quads as bilinear patches
-    auto& shape = scene.shapes[instance.shape];
-    if ((!shape.points.empty() && params.points_as_spheres) ||
-        (!shape.lines.empty() && params.lines_as_cones)) {
-      position = transform_point(instance.frame, intersection.position);
-      normal   = transform_direction(instance.frame, intersection.normal);
-    } else {
-      // MY CODE: Add FLAGs to switch intersection methods
+    if (params.intersection_method) {
+      // Compute normal and position in yocto_scene.{h/cpp}
       position = eval_shading_position(scene, intersection, outgoing, params);
       normal   = eval_shading_normal(scene, intersection, outgoing, params);
+    } else {
+      // Compute normal and position in yocto_geometry.h
+      // NOTE: Like in the eval_position check if there is a shape, and then
+      // which method we are using, i.e.:
+      //  - points or points as spheres
+      //  - lines or lines as rounded cones
+      //  - quads or quads as bilinear patches
+      auto& instance = scene.instances[intersection.instance];
+      auto& shape    = scene.shapes[instance.shape];
+      if ((!shape.points.empty() && params.points_as_spheres) ||
+          (!shape.lines.empty() && params.lines_as_cones)) {
+        position = transform_point(instance.frame, intersection.position);
+        normal   = transform_normal(instance.frame, intersection.normal);
+      } else {
+        position = eval_shading_position(scene, intersection, outgoing, params);
+        normal   = eval_shading_normal(scene, intersection, outgoing, params);
+      }
     }
     auto material = eval_material(scene, instance, element, uv);
 
@@ -1610,25 +1715,38 @@ static trace_result trace_falsecolor(const scene_data& scene,
 
   // prepare shading point
   auto outgoing = -ray.d;
-  // MY CODE: I decided to change the data to return the intersection normal
-  // and position directly from the intersection call, and not to modify the
-  // eval_normal and eval_position functions in yocto_scene.{h/cpp}.
+  // ORIGINAL CODE
+  // auto position = eval_shading_position( scene, intersection, outgoing,
+  // params);
+  /// auto normal = eval_shading_normal(scene, intersection, outgoing,
+  /// params);
+
+  // MY CODE: As default use values of normal and position for Spheres and
+  // Cones returned by intersection function. If params.intersection_method
+  // is true, then compute normal and position in eval_shading_position and
+  // eval_shading_normal functions.
   vec3f position, normal;
-  // NOTE: Like in the eval_position check if there is a shape, and then
-  // which method we are using, i.e.:
-  //  - points or points as spheres
-  //  - lines or lines as rounded cones
-  //  - quads or quads as bilinear patches
-  auto& instance = scene.instances[intersection.instance];
-  auto& shape    = scene.shapes[instance.shape];
-  if ((!shape.points.empty() && params.points_as_spheres) ||
-      (!shape.lines.empty() && params.lines_as_cones)) {
-    position = transform_point(instance.frame, intersection.position);
-    normal   = transform_direction(instance.frame, intersection.normal);
-  } else {
-    // MY CODE: Add FLAGs to switch intersection methods
+  if (params.intersection_method) {
+    // Compute normal and position in yocto_scene.{h/cpp}
     position = eval_shading_position(scene, intersection, outgoing, params);
     normal   = eval_shading_normal(scene, intersection, outgoing, params);
+  } else {
+    // Compute normal and position in yocto_geometry.h
+    // NOTE: Like in the eval_position check if there is a shape, and then
+    // which method we are using, i.e.:
+    //  - points or points as spheres
+    //  - lines or lines as rounded cones
+    //  - quads or quads as bilinear patches
+    auto& instance = scene.instances[intersection.instance];
+    auto& shape    = scene.shapes[instance.shape];
+    if ((!shape.points.empty() && params.points_as_spheres) ||
+        (!shape.lines.empty() && params.lines_as_cones)) {
+      position = transform_point(instance.frame, intersection.position);
+      normal   = transform_normal(instance.frame, intersection.normal);
+    } else {
+      position = eval_shading_position(scene, intersection, outgoing, params);
+      normal   = eval_shading_normal(scene, intersection, outgoing, params);
+    }
   }
 
   // MY CODE: Add FLAGs to switch intersection methods

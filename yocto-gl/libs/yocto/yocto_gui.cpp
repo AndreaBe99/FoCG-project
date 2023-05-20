@@ -306,8 +306,13 @@ bool draw_trace_widgets(const gui_input& input, int sample,
 
     // MY CODE: Add FLAGS for the different approaches of the project
     edited += draw_gui_checkbox("points as spheres", params.points_as_spheres);
-    edited += draw_gui_checkbox("lines as rounded cones", params.lines_as_cones);
-    edited += draw_gui_checkbox("quads as bilinear patches", params.quads_as_patches);
+    edited += draw_gui_checkbox(
+        "lines as rounded cones", params.lines_as_cones);
+    edited += draw_gui_checkbox(
+        "quads as bilinear patches", params.quads_as_patches);
+    edited += draw_gui_checkbox(
+        "compute normal in yocto_scene (default yocto_geometry)",
+        params.intersection_method);
     end_gui_header();
   }
   return (bool)edited;
