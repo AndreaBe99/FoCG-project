@@ -941,36 +941,34 @@ inline prim_intersection intersect_cone(
     vec3f position = ray_point(ray, t);
     vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
 
+    // Compute polar coordinates u and v
+    /*auto phi = atan2(position.y, position.x);
+    if (phi < 0.) phi += 2.f * pif;
+    auto u  = phi / (2 * pif);
+    auto v  = position.z / length(p1 - p0);
+    auto uv = vec2f{u, v};*/
     // First of all find the virtual base of the cone
     auto base_radius = r0 > r1 ? r0 : r1;
     auto base_center = r0 > r1 ? p0 : p1;
     auto apex_radius = r0 <= r1 ? r0 : r1;
     auto apex_center = r0 <= r1 ? p0 : p1;
-
     // Compute vector AB and AP
     auto AB = base_center - apex_center;
     auto AP = position - apex_center;
-
     // Compute lengths of AB and AP
     auto len_AB = length(AB);
     auto len_AP = length(AP);
-
     // Compute cosine and sine of angle between AB and AP
     auto cos_theta = dot(AB, AP) / (len_AB * len_AP);
     auto sin_theta = length(cross(AB, AP)) / (len_AB * len_AP);
-
     // Compute angle between AB and AP
     auto theta = acos(cos_theta);
-
     // Compute angle between x-axis and projection of AP onto x-y plane
     auto phi = atan2(AP.y, AP.x);
-
     // Compute polar coordinates u and v
-    auto u = theta;
-    auto v = phi;
-
+    auto u  = theta;
+    auto v  = phi;
     auto uv = vec2f{u, v};
-
     // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
     return {uv, t, true, position, normal};
@@ -1003,35 +1001,34 @@ inline prim_intersection intersect_cone(
   // compute position and normal
   vec3f position = ray_point(ray, t);
 
+  // Compute polar coordinates u and v
+  /*auto phi = atan2(position.y, position.x);
+  if (phi < 0.) phi += 2.f * pif;
+  auto u  = phi / (2 * pif);
+  auto v  = position.z / length(p1 - p0);
+  auto uv = vec2f{u, v};*/
   // First of all find the virtual base of the cone
   auto base_radius = r0 > r1 ? r0 : r1;
   auto base_center = r0 > r1 ? p0 : p1;
   auto apex_radius = r0 <= r1 ? r0 : r1;
   auto apex_center = r0 <= r1 ? p0 : p1;
-
   // Compute vector AB and AP
   auto AB = base_center - apex_center;
   auto AP = position - apex_center;
-
   // Compute lengths of AB and AP
   auto len_AB = length(AB);
   auto len_AP = length(AP);
-
   // Compute cosine and sine of angle between AB and AP
   auto cos_theta = dot(AB, AP) / (len_AB * len_AP);
   auto sin_theta = length(cross(AB, AP)) / (len_AB * len_AP);
-
   // Compute angle between AB and AP
   auto theta = acos(cos_theta);
-
   // Compute angle between x-axis and projection of AP onto x-y plane
   auto phi = atan2(AP.y, AP.x);
-
   // Compute polar coordinates u and v
   auto u  = theta;
   auto v  = phi;
   auto uv = vec2f{u, v};
-
   // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
   return {uv, r, true, position, normal};
@@ -1184,6 +1181,12 @@ inline prim_intersection intersect_patch(const ray3f& ray, const vec3f& p0,
   auto position = q00 * (1 - u) * (1 - v) + q10 * u * (1 - v) +
                   q01 * (1 - u) * v + q11 * u * v;
 
+  // NOTE: The following code is not complete, because we need to consider also
+  // type material of the shape (see eval_shading_normal() in yocto_scene.cpp),
+  // but to do this we need to modify the code and the structure of yocto too
+  // much, for this reason I decided to implement the code to compute normals
+  // on yocto_scene.cpp, eval_normal() function.
+  // For completeness, I report the code to compute normals here.
   // compute normal
   auto normal = vec3f{0, 0, 0};
   if (shape_normals.empty()) {

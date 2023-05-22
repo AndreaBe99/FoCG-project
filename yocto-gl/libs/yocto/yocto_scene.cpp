@@ -328,8 +328,8 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
     auto l = shape.lines[element];
 
     // ORIGINAL CODE
-    return transform_point(instance.frame,
-        interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
+    // return transform_point(instance.frame,
+    //    interpolate_line(shape.positions[l.x], shape.positions[l.y], uv.x));
 
     // MY CODE
     if (lines_as_cones) {
@@ -346,13 +346,20 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
       auto apex_radius = r0 <= r1 ? r0 : r1;
       auto apex_center = r0 <= r1 ? p0 : p1;
 
+      /*auto phi = uv.x * (2 * pif);
+      // Calculate the x, y, and z coordinates using cylindrical to Cartesian
+      // conversion
+      auto x        = max(r0, r1) * cos(phi);
+      auto y        = max(r0, r1) * sin(phi);
+      auto z        = uv.y * length(apex_center - base_center);
+      auto position = vec3f{x, y, z};*/
+
       // Compute vector AB
       auto AB = base_center - apex_center;
       // Compute vector AP
       auto AP = base_radius * sin(uv.x) * cos(uv.y) * normalize(AB) +
                 base_radius * sin(uv.x) * sin(uv.y) * normalize(AB) +
                 base_radius * cos(uv.x) * normalize(AB);
-
       // Compute point P
       auto position = apex_center + AP;
 
@@ -508,9 +515,9 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
   } else if (!shape.lines.empty()) {
     auto l = shape.lines[element];
     // ORIGINAL CODE
-    return transform_normal(instance.frame,
-        normalize(
-            interpolate_line(shape.normals[l.x], shape.normals[l.y], uv.x)));
+    // return transform_normal(instance.frame,
+    //    normalize( interpolate_line(shape.normals[l.x], shape.normals[l.y],
+    //    uv.x)));
 
     // MY CODE
     if (lines_as_cones) {
@@ -526,39 +533,23 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       // Rename the other point
       auto apex_radius = r0 <= r1 ? r0 : r1;
       auto apex_center = r0 <= r1 ? p0 : p1;
-      auto phi         = 2 * pif * uv.x;
+
+      /*auto phi = uv.x * (2 * pif);
+      // Calculate the x, y, and z coordinates using cylindrical to Cartesian
+      // conversion
+      auto x        = max(r0, r1) * cos(phi);
+      auto y        = max(r0, r1) * sin(phi);
+      auto z        = uv.y * length(apex_center - base_center);
+      auto position = vec3f{x, y, z};*/
 
       // Compute vector AB
       auto AB = base_center - apex_center;
-
       // Compute vector AP
       auto AP = base_radius * sin(uv.x) * cos(uv.y) * normalize(AB) +
                 base_radius * sin(uv.x) * sin(uv.y) * normalize(AB) +
                 base_radius * cos(uv.x) * normalize(AB);
-
       // Compute point P
       auto position = apex_center + AP;
-
-      /*
-        To determine if a point P is on one of the two spheres or on the lateral
-        part of the cone, you can use the following steps:
-
-        1. Calculate the distance between point P and the center of each sphere,
-            i.e., P0 and P1.
-
-        2. If the distance between P and P0 is approximately equal to R0, then P
-            is on the sphere with radius R0. Similarly, if the distance between
-            P and P1 is approximately equal to R1, then P is on the sphere with
-            radius R1.
-
-        3. If P is not on either of the spheres, calculate the distance between
-            P and the line segment connecting P0 and P1, which represents the
-            axis of the cone.
-
-        4. If the distance between P and the axis of the cone is approximately
-            equal to the radius of the cone at the height of P, then P is on the
-            lateral part of the cone.
-      */
 
       // Compute the distance between point P and the center of each sphere
       auto d0 = distance(position, p0);
@@ -571,8 +562,8 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
         return transform_normal(instance.frame, normalize(position - p1));
       } else {
         // P is on the lateral part of the cone
-
-        // Check if it is a cone or a cylinder
+        // Check if it is a cone or a cylinder, because if the two radius
+        // are equal, the virtual apex does not exist.
         if (r0 != r1) {
           // Compute the real position of the virtual apex. based on the
           // calculus of the paper Ray Tracing Generalized Tube Primitives:
@@ -590,7 +581,6 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
           auto height = length(apex - z_one);
 
           // Compute vector orientation of the cone
-          // auto c = normalize(apex - base_center);
           // Normal Formula From :
           // https://github.com/iceman201/RayTracing/blob/master/Ray%20tracing/Cone.cpp
           float r = sqrt((position.x - c.x) * (position.x - c.x) +
@@ -603,7 +593,10 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
 
         // The radius of the cone is the same
         // Compute vector orientation of the cylinder
-        auto c = normalize(apex_center - base_center);
+        // auto c = normalize(apex_center - base_center);
+        auto c = (base_center - apex_center) /
+                 length(base_center - apex_center);
+
         // Normal Formula From:
         // https://github.com/iceman201/RayTracing/blob/master/Ray%20tracing/Cylinder.cpp
         auto n      = vec3f{position.x - c.x, 0, position.z - c.z};
@@ -611,7 +604,6 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
 
         return transform_normal(instance.frame, normal);
       }
-
     } else {
       return transform_normal(instance.frame,
           normalize(

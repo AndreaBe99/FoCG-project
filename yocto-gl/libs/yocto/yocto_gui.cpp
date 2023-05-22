@@ -311,7 +311,7 @@ bool draw_trace_widgets(const gui_input& input, int sample,
     edited += draw_gui_checkbox(
         "quads as bilinear patches", params.quads_as_patches);
     edited += draw_gui_checkbox(
-        "compute normal in yocto_scene (default yocto_geometry)",
+        "compute normal in yocto_scene \n \t (default yocto_geometry)",
         params.intersection_method);
     end_gui_header();
   }

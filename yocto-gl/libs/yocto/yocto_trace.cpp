@@ -559,15 +559,20 @@ static trace_result trace_path(const scene_data& scene, const trace_bvh& bvh,
       }
 
       // TEST: check if position and position_b are the same
-      /*if (position.x != position_old.x || position.y != position_old.y ||
+      /*
+      auto position_old = eval_shading_position(
+          scene, intersection, outgoing, params);
+      auto normal_old = eval_shading_normal(
+          scene, intersection, outgoing, params);
+      if (position.x != position_old.x || position.y != position_old.y ||
           position.z != position_old.z) {
-        printf("%d position sce: %f %f %f \n %d position geo: %f %f %f \n",
+        printf("%d position geo: %f %f %f \n %d position sce: %f %f %f \n",
             bounce, position.x, position.y, position.z, bounce, position_old.x,
             position_old.y, position_old.z);
       }
       if (normal.x != normal_old.x || normal.y != normal_old.y ||
           normal.z != normal_old.z) {
-        printf("%d normal sce: %f %f %f \n %d normal geo: %f %f %f \n \n",
+        printf("%d normal geo: %f %f %f \n %d normal sce: %f %f %f \n \n",
             bounce, normal.x, normal.y, normal.z, bounce, normal_old.x,
             normal_old.y, normal_old.z);
       }*/
