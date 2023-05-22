@@ -27,7 +27,7 @@ To execute a test, you can perform (inside [`yocto-gl`](yocto-gl/) folder):
 ./bin/ytrace --scene "test/file/path"  --output out/file/path --sampler path --samples 256 --resolution 4060 --bounces 8 --camera front
 ```
 
-add `--points --lines --quads` to chnage the intersection mode to **enhanced**.
+add `--points --lines --quads` to change the intersection mode to **enhanced**, or add `--intersection` to use the normal calculated in `eval_normal()`, instead of using the normal calculated in the intersection primitive functions.
 
 A general guide with major changes in the code is available in [`markdown/ste-by-step_guide.md`](markdown/step-by-step_guide.md), all change of the code are marked with the comment `// MY CODE`.
 
@@ -36,21 +36,21 @@ A general guide with major changes in the code is available in [`markdown/ste-by
 The image is composed of five objects, starting from the left, a sphere composed of bilinear patches, a point grid, a thick point grid (thus composed of spheres as primitives), a line grid, and finally a thick line grid (thus composed of Rounded Cone as primitives).
 
 #### Vanilla
-![shapes4_vanilla.jpg](test/trace_path/1024-sample_2160-resolution_8-bounce/shapes4_vanilla.jpg)
+![shapes4_vanilla.jpg](test/trace_path/yocto_geometry/1024-sample_2160-resolution_8-bounce/shapes4_vanilla.jpg)
 
 - samples: 1024, resolution: 2160, bounce: 8.
 
-![shapes4_vanilla_front.jpg](test/trace_path/256-sample_4060-resolution_8-bounce/shapes4_vanilla_front.jpg)
+![shapes4_vanilla_front.jpg](test/trace_path/yocto_geometry/256-sample_4060-resolution_8-bounce/shapes4_vanilla_front.jpg)
 
 - samples: 256, resolution: 4060, bounce: 8.
 
 #### Enhanced
 
-![shapes4_enhanced.jpg](test/trace_path/1024-sample_2160-resolution_8-bounce/shapes4_enhanced.jpg)
+![shapes4_enhanced.jpg](test/trace_path/yocto_geometry/1024-sample_2160-resolution_8-bounce/shapes4_enhanced.jpg)
 
 - samples: 1024, resolution: 2160, bounce: 8.
 
-![shapes4_enhanced_front.jpg](test/trace_path/256-sample_4060-resolution_8-bounce/shapes4_enhanced_front.jpg)
+![shapes4_enhanced_front.jpg](test/trace_path/yocto_geometry/256-sample_4060-resolution_8-bounce/shapes4_enhanced_front.jpg)
 
 - samples: 256, resolution: 4060, bounce: 8.
 
@@ -61,13 +61,13 @@ The image consists of five objects, starting from the left, a sphere composed of
 
 #### Vanilla
 
-![features2_vanilla.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/features2_vanilla.jpg)
+![features2_vanilla.jpg](test/trace_path/yocto_geometry/256-sample_2160-resolution_8-bounce/features2_vanilla.jpg)
 
 * samples: 256, resolution: 2160, bounce: 8.
 
 #### Enhanced
 
-![features2_enhanced.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/features2_enhanced.jpg)
+![features2_enhanced.jpg](test/trace_path/yocto_geometry/256-sample_2160-resolution_8-bounce/features2_enhanced.jpg)
 
 * samples: 256, resolution: 2160, bounce: 8.
 
@@ -77,13 +77,13 @@ The image is composed of four different hairball.
 
 #### Vanilla
 
-![shapes3_vanilla.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/shapes3_vanilla.jpg)
+![shapes3_vanilla.jpg](test/trace_path/yocto_geometry/256-sample_2160-resolution_8-bounce/shapes3_vanilla.jpg)
 
 * samples: 256, resolution: 2160, bounce: 8.
 
 #### Enhanced
 
-![shapes3_enhanced.jpg](test/trace_path/256-sample_2160-resolution_8-bounce/shapes3_enhanced.jpg)
+![shapes3_enhanced.jpg](test/trace_path/yocto_geometry/256-sample_2160-resolution_8-bounce/shapes3_enhanced.jpg)
 
 * samples: 1024, resolution: 2160, bounce: 8.
 
