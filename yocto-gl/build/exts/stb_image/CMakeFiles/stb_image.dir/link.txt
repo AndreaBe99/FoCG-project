@@ -1,0 +1,2 @@
+/usr/bin/ar qc /home/andrea/Documenti/Università/fundamental-of-computer-graphics/actual-project/FoCG-project/yocto-gl/bin/libstb_image.a CMakeFiles/stb_image.dir/stb_image/stb_image.cpp.o
+/usr/bin/ranlib /home/andrea/Documenti/Università/fundamental-of-computer-graphics/actual-project/FoCG-project/yocto-gl/bin/libstb_image.a

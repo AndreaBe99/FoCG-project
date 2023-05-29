@@ -1,0 +1,2 @@
+/usr/bin/ar qc /home/andrea/Documenti/Università/fundamental-of-computer-graphics/actual-project/FoCG-project/yocto-gl/bin/libglad.a CMakeFiles/glad.dir/glad/glad.c.o
+/usr/bin/ranlib /home/andrea/Documenti/Università/fundamental-of-computer-graphics/actual-project/FoCG-project/yocto-gl/bin/libglad.a
