@@ -960,6 +960,8 @@ inline prim_intersection intersect_cone(
     // Compute angle between x-axis and projection of v0p onto x-y plane
     auto v  = atan2(v0p.y, v0p.x);
     auto uv = vec2f{u, v};
+
+    // OLD: Compute u and v as yocto
     // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
     return {uv, t, true, position, normal};
@@ -1011,6 +1013,8 @@ inline prim_intersection intersect_cone(
   // Compute angle between x-axis and projection of v0p onto x-y plane
   auto v  = atan2(v0p.y, v0p.x);
   auto uv = vec2f{u, v};
+
+  // OLD: Compute u and v as yocto
   // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
   return {uv, r, true, position, normal};
