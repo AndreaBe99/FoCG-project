@@ -346,22 +346,14 @@ vec3f eval_position(const scene_data& scene, const instance_data& instance,
       auto apex_radius = r0 <= r1 ? r0 : r1;
       auto apex_center = r0 <= r1 ? p0 : p1;
 
-      /*auto phi = uv.x * (2 * pif);
-      // Calculate the x, y, and z coordinates using cylindrical to Cartesian
-      // conversion
-      auto x        = max(r0, r1) * cos(phi);
-      auto y        = max(r0, r1) * sin(phi);
-      auto z        = uv.y * length(apex_center - base_center);
-      auto position = vec3f{x, y, z};*/
-
-      // Compute vector AB
-      auto AB = base_center - apex_center;
-      // Compute vector AP
-      auto AP = base_radius * sin(uv.x) * cos(uv.y) * normalize(AB) +
-                base_radius * sin(uv.x) * sin(uv.y) * normalize(AB) +
-                base_radius * cos(uv.x) * normalize(AB);
+      // Compute vector v01
+      auto v01 = base_center - apex_center;
+      // Compute vector v0p
+      auto v0p = base_radius * sin(uv.x) * cos(uv.y) * normalize(v01) +
+                 base_radius * sin(uv.x) * sin(uv.y) * normalize(v01) +
+                 base_radius * cos(uv.x) * normalize(v01);
       // Compute point P
-      auto position = apex_center + AP;
+      auto position = apex_center + v0p;
 
       return transform_point(instance.frame, position);
 
@@ -534,22 +526,14 @@ vec3f eval_normal(const scene_data& scene, const instance_data& instance,
       auto apex_radius = r0 <= r1 ? r0 : r1;
       auto apex_center = r0 <= r1 ? p0 : p1;
 
-      /*auto phi = uv.x * (2 * pif);
-      // Calculate the x, y, and z coordinates using cylindrical to Cartesian
-      // conversion
-      auto x        = max(r0, r1) * cos(phi);
-      auto y        = max(r0, r1) * sin(phi);
-      auto z        = uv.y * length(apex_center - base_center);
-      auto position = vec3f{x, y, z};*/
-
-      // Compute vector AB
-      auto AB = base_center - apex_center;
-      // Compute vector AP
-      auto AP = base_radius * sin(uv.x) * cos(uv.y) * normalize(AB) +
-                base_radius * sin(uv.x) * sin(uv.y) * normalize(AB) +
-                base_radius * cos(uv.x) * normalize(AB);
+      // Compute vector v01
+      auto v01 = base_center - apex_center;
+      // Compute vector v0p
+      auto v0p = base_radius * sin(uv.x) * cos(uv.y) * normalize(v01) +
+                 base_radius * sin(uv.x) * sin(uv.y) * normalize(v01) +
+                 base_radius * cos(uv.x) * normalize(v01);
       // Compute point P
-      auto position = apex_center + AP;
+      auto position = apex_center + v0p;
 
       // Compute the distance between point P and the center of each sphere
       auto d0 = distance(position, p0);

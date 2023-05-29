@@ -942,32 +942,23 @@ inline prim_intersection intersect_cone(
     vec3f normal   = normalize(d2 * (oa + t * ray.d) - ba * y);
 
     // Compute polar coordinates u and v
-    /*auto phi = atan2(position.y, position.x);
-    if (phi < 0.) phi += 2.f * pif;
-    auto u  = phi / (2 * pif);
-    auto v  = position.z / length(p1 - p0);
-    auto uv = vec2f{u, v};*/
+
     // First of all find the virtual base of the cone
     auto base_radius = r0 > r1 ? r0 : r1;
     auto base_center = r0 > r1 ? p0 : p1;
     auto apex_radius = r0 <= r1 ? r0 : r1;
     auto apex_center = r0 <= r1 ? p0 : p1;
-    // Compute vector AB and AP
-    auto AB = base_center - apex_center;
-    auto AP = position - apex_center;
+    // Compute vector cone orientation vector (v01) and
+    // vector from the apex to the intersection (v0p)
+    auto v01 = base_center - apex_center;
+    auto v0p = position - apex_center;
     // Compute lengths of AB and AP
-    auto len_AB = length(AB);
-    auto len_AP = length(AP);
-    // Compute cosine and sine of angle between AB and AP
-    auto cos_theta = dot(AB, AP) / (len_AB * len_AP);
-    auto sin_theta = length(cross(AB, AP)) / (len_AB * len_AP);
-    // Compute angle between AB and AP
-    auto theta = acos(cos_theta);
-    // Compute angle between x-axis and projection of AP onto x-y plane
-    auto phi = atan2(AP.y, AP.x);
-    // Compute polar coordinates u and v
-    auto u  = theta;
-    auto v  = phi;
+    auto len_v01 = length(v01);
+    auto len_v0p = length(v0p);
+    // Compute angle between v01 and v0p, u
+    auto u = acos(dot(v01, v0p) / (len_v01 * len_v0p));
+    // Compute angle between x-axis and projection of v0p onto x-y plane
+    auto v  = atan2(v0p.y, v0p.x);
     auto uv = vec2f{u, v};
     // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
@@ -1002,32 +993,23 @@ inline prim_intersection intersect_cone(
   vec3f position = ray_point(ray, t);
 
   // Compute polar coordinates u and v
-  /*auto phi = atan2(position.y, position.x);
-  if (phi < 0.) phi += 2.f * pif;
-  auto u  = phi / (2 * pif);
-  auto v  = position.z / length(p1 - p0);
-  auto uv = vec2f{u, v};*/
+
   // First of all find the virtual base of the cone
   auto base_radius = r0 > r1 ? r0 : r1;
   auto base_center = r0 > r1 ? p0 : p1;
   auto apex_radius = r0 <= r1 ? r0 : r1;
   auto apex_center = r0 <= r1 ? p0 : p1;
-  // Compute vector AB and AP
-  auto AB = base_center - apex_center;
-  auto AP = position - apex_center;
+  // Compute vector cone orientation vector (v01) and
+  // vector from the apex to the intersection (v0p)
+  auto v01 = base_center - apex_center;
+  auto v0p = position - apex_center;
   // Compute lengths of AB and AP
-  auto len_AB = length(AB);
-  auto len_AP = length(AP);
-  // Compute cosine and sine of angle between AB and AP
-  auto cos_theta = dot(AB, AP) / (len_AB * len_AP);
-  auto sin_theta = length(cross(AB, AP)) / (len_AB * len_AP);
-  // Compute angle between AB and AP
-  auto theta = acos(cos_theta);
-  // Compute angle between x-axis and projection of AP onto x-y plane
-  auto phi = atan2(AP.y, AP.x);
-  // Compute polar coordinates u and v
-  auto u  = theta;
-  auto v  = phi;
+  auto len_v01 = length(v01);
+  auto len_v0p = length(v0p);
+  // Compute angle between v01 and v0p, u
+  auto u = acos(dot(v01, v0p) / (len_v01 * len_v0p));
+  // Compute angle between x-axis and projection of v0p onto x-y plane
+  auto v  = atan2(v0p.y, v0p.x);
   auto uv = vec2f{u, v};
   // vec2f uv = compute_cone_uv(ray, p0, p1, r0, r1, position, normal);
 
