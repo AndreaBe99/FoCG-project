@@ -29,6 +29,8 @@ To execute a test, you can perform (inside [`yocto-gl`](yocto-gl/) folder):
 
 add `--points --lines --quads` to change the intersection mode to **enhanced**, or add `--intersection` to use the normal calculated in `eval_normal()`, instead of using the normal calculated in the intersection primitive functions.
 
+If you want to see the render in real type add `--interactive` in the CLI command.
+
 A general guide with major changes in the code is available in [`markdown/ste-by-step_guide.md`](markdown/step-by-step_guide.md), all change of the code are marked with the comment `// MY CODE`.
 
 ### Shapes 4 
@@ -44,6 +46,10 @@ The image is composed of five objects, starting from the left, a sphere composed
 
 - samples: 256, resolution: 4060, bounce: 8.
 
+```bash
+./bin/ytrace --scene tests/_version43/materials4/materials4.json  --output out/materials4_vanilla.jpg --sampler path --samples 256 --resolution 4060 --bounces 8 --camera front
+```
+
 #### Enhanced
 
 ![shapes4_enhanced.jpg](test/trace_path/yocto_geometry/1024-sample_2160-resolution_8-bounce/shapes4_enhanced.jpg)
@@ -53,6 +59,10 @@ The image is composed of five objects, starting from the left, a sphere composed
 ![shapes4_enhanced_front.jpg](test/trace_path/yocto_geometry/256-sample_4060-resolution_8-bounce/shapes4_enhanced_front.jpg)
 
 - samples: 256, resolution: 4060, bounce: 8.
+
+```bash
+./bin/ytrace --scene tests/_version43/materials4/materials4.json  --output out/materials4_enanched.jpg --sampler path --samples 256 --resolution 4060 --bounces 8 --camera front --point --lines --quads
+```
 
 
 ### Features 2
@@ -65,11 +75,19 @@ The image consists of five objects, starting from the left, a sphere composed of
 
 * samples: 256, resolution: 2160, bounce: 8.
 
+```bash
+./bin/ytrace --scene tests/features2/features2.json  --output out/features2_vanilla.jpg --sampler path --samples 256 --resolution 4060 --bounces 8
+```
+
 #### Enhanced
 
 ![features2_enhanced.jpg](test/trace_path/yocto_geometry/256-sample_2160-resolution_8-bounce/features2_enhanced.jpg)
 
 * samples: 256, resolution: 2160, bounce: 8.
+
+```bash
+./bin/ytrace --scene tests/features2/features2.json  --output out/features2_enhanced.jpg --sampler path --samples 256 --resolution 4060 --bounces 8 --camera front --point --lines --quads
+```
 
 
 ### Shapes 3
@@ -81,9 +99,16 @@ The image is composed of four different hairball.
 
 * samples: 256, resolution: 2160, bounce: 8.
 
+```bash
+./bin/ytrace --scene tests/_version43/shapes3/shapes3.json  --output out/shapes3_vanilla.jpg --sampler path --samples 256 --resolution 4060 --bounces 8
+```
+
 #### Enhanced
 
 ![shapes3_enhanced.jpg](test/trace_path/yocto_geometry/256-sample_2160-resolution_8-bounce/shapes3_enhanced.jpg)
 
 * samples: 1024, resolution: 2160, bounce: 8.
 
+```bash
+./bin/ytrace --scene tests/_version43/shapes3/shapes3.json --output out/shapes3_enhanced.jpg --sampler path --samples 256 --resolution 4060 --bounces 8 --point --lines --quads
+```
