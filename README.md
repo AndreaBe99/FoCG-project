@@ -19,7 +19,7 @@ More info at [`markdown/project_guideline.md`](markdown/project_guideline.md).
 
 Tests are divided by **vanilla** (points as points, lines as lines, and quads as quads) and **enhanced** (points as spheres, lines as rounded cones, and quads as bilinear patches).
 
-The complete folder with all the tests is [`test`](test/).
+The complete folder with all the tests (done with the simple path tracer as sampler) is [`test`](test/).
 
 To execute a test, you can perform (inside [`yocto-gl`](yocto-gl/) folder):
 
